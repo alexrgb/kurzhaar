@@ -1,0 +1,10 @@
+[package]
+name = "kurzhaar-stream"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "stream"
+path = "src/main.rs"

@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/*",
+  "services/*",
+]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/alexrgb/kurzhaar"
+version = "0.0.0"
+publish = false

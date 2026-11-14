@@ -1,0 +1,82 @@
+{
+  "_comment": "Conformance vectors for wire format v1. Every implementation must decode `body` to `expected`, or fail with `error`.",
+  "vectors": [
+    {
+      "name": "single pageview",
+      "body": "v::1|k::abc|s::1920x1080|l::uk-UA\nts::1731150000000|u::/|t::Home|r::google.com/",
+      "expected": {
+        "key": "abc", "screen": "1920x1080", "lang": "uk-UA",
+        "events": [
+          { "ts": 1731150000000, "type": 0, "url": "/", "title": "Home", "referrer": "google.com/", "props": {} }
+        ]
+      }
+    },
+    {
+      "name": "delta timestamps",
+      "body": "v::1|k::abc\nts::1000|u::/\nd::4000|u::/pricing\nd::500|y::1|n::cta|u::/pricing",
+      "expected": {
+        "key": "abc",
+        "events": [
+          { "ts": 1000, "type": 0, "url": "/", "props": {} },
+          { "ts": 5000, "type": 0, "url": "/pricing", "props": {} },
+          { "ts": 5500, "type": 1, "name": "cta", "url": "/pricing", "props": {} }
+        ]
+      }
+    },
+    {
+      "name": "custom event with properties",
+      "body": "v::1|k::abc\nts::10|y::1|n::signup|u::/signup|p.plan::pro|p.seats::5",
+      "expected": {
+        "key": "abc",
+        "events": [
+          { "ts": 10, "type": 1, "name": "signup", "url": "/signup", "props": { "plan": "pro", "seats": "5" } }
+        ]
+      }
+    },
+    {
+      "name": "identify",
+      "body": "v::1|k::abc|i::user-42\nts::10|y::2|p.plan::pro",
+      "expected": {
+        "key": "abc", "identity": "user-42",
+        "events": [
+          { "ts": 10, "type": 2, "props": { "plan": "pro" } }
+        ]
+      }
+    },
+    {
+      "name": "escaped separators in values",
+      "body": "v::1|k::abc\nts::10|y::1|n::note|p.text::a%7Cb%0Ac%25d",
+      "expected": {
+        "key": "abc",
+        "events": [
+          { "ts": 10, "type": 1, "name": "note", "props": { "text": "a|b\nc%d" } }
+        ]
+      }
+    },
+    {
+      "name": "escaped property name",
+      "body": "v::1|k::abc\nts::10|y::1|n::x|p.we%3Aird%7Ckey::v",
+      "expected": {
+        "key": "abc",
+        "events": [
+          { "ts": 10, "type": 1, "name": "x", "props": { "we:ird|key": "v" } }
+        ]
+      }
+    },
+    {
+      "name": "unknown fields are ignored",
+      "body": "v::1|k::abc\nts::10|u::/|future::1",
+      "expected": {
+        "key": "abc",
+        "events": [
+          { "ts": 10, "type": 0, "url": "/", "props": {} }
+        ]
+      }
+    },
+    {
+      "name": "unsupported version",
+      "body": "v::9|k::abc\nts::10|u::/",
+      "error": "unsupported protocol version"
+    }
+  ]
+}

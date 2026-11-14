@@ -1,0 +1,11 @@
+node_modules/
+dist/
+target/
+.turbo/
+.build/
+.DS_Store
+.claude/
+.env
+.env.*
+!.env.example
+.swiftpm/

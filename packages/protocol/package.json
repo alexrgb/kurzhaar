@@ -1,0 +1,11 @@
+{
+  "name": "@kurzhaar/protocol",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Reference decoder for the Kurzhaar wire format v1",
+  "main": "src/decode.js",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

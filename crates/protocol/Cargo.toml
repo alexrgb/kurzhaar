@@ -1,0 +1,13 @@
+[package]
+name = "kurzhaar-protocol"
+description = "Decoder for the Kurzhaar wire format v1"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"
