@@ -1,0 +1,29 @@
+format: 1
+modules:
+- core
+- specs
+- tests
+- adrs
+- decisions
+- standards
+- architecture
+- statemachines
+- consistency
+- debt
+- risks
+- ci
+- agents
+- mcp
+topology: single
+id_scheme: random
+trace:
+  exclude: []
+  languages:
+  - typescript
+  - rust
+  - swift
+  - kotlin
+  - dart
+  - sql
+agents:
+- claude
