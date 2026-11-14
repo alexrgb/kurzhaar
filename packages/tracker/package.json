@@ -3,13 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
-  "description": "Light, cookieless browser tracker (prototype, JavaScript; to be ported to TypeScript)",
+  "description": "Light, cookieless browser tracker (TypeScript source, built with esbuild)",
   "scripts": {
     "build": "node build.mjs",
+    "typecheck": "tsc -p .",
     "test": "node --test test/*.test.js"
   },
   "devDependencies": {
     "@kurzhaar/protocol": "workspace:*",
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.3"
   }
 }
