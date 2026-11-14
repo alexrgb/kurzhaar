@@ -1,0 +1,15 @@
+{
+  "name": "@kurzhaar/tracker",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Light, cookieless browser tracker (prototype, JavaScript; to be ported to TypeScript)",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "@kurzhaar/protocol": "workspace:*",
+    "esbuild": "^0.25.0"
+  }
+}
