@@ -5,6 +5,7 @@ status: draft
 links:
   decided-by:
     - ADR-M1DT
+    - ADR-0GM5
 ---
 ### Requirement: Enforce scopes and site restrictions
 The system SHALL authorize each request against the scopes and sites bound to the key.

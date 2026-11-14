@@ -6,6 +6,7 @@ links:
   decided-by:
     - ADR-WXH3
     - ADR-XET8
+    - ADR-83V0
 ---
 ### Requirement: Delete data by identity
 The system SHALL delete all events of an identified user in the RAW, API and dashboard clusters through an audited job.

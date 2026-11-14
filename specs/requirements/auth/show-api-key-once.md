@@ -5,6 +5,7 @@ status: draft
 links:
   decided-by:
     - ADR-M1DT
+    - ADR-0GM5
 ---
 ### Requirement: Show API key once
 The system SHALL display a newly created API key exactly once and store only its hash.

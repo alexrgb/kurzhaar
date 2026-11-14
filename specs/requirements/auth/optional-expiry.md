@@ -5,6 +5,7 @@ status: draft
 links:
   decided-by:
     - ADR-M1DT
+    - ADR-0GM5
 ---
 ### Requirement: Optional expiry
 The system SHALL reject a key after its expiry time when one is set.

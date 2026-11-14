@@ -5,6 +5,7 @@ status: draft
 links:
   decided-by:
     - ADR-M1DT
+    - ADR-0GM5
 ---
 ### Requirement: Validate a key without side effects
 The system SHALL provide an endpoint that reports a key status, scopes, sites and expiry without changing any state.

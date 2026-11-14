@@ -5,6 +5,7 @@ status: draft
 links:
   decided-by:
     - ADR-M1DT
+    - ADR-0GM5
 ---
 ### Requirement: Propagate revocation quickly
 The system SHALL make a revoked key stop working in every service within 60 seconds.
