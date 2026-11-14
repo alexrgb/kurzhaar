@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  OXISPEC_VERSION: 0.1.0-rc.4
+
+jobs:
+  specs:
+    name: Specs (oxispec check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install oxispec
+        run: |
+          base="https://github.com/alexrgb/oxispec/releases/download/v${OXISPEC_VERSION}"
+          file="oxispec-x86_64-unknown-linux-gnu.tar.xz"
+          curl -fsSLO "$base/$file"
+          curl -fsSLO "$base/$file.sha256"
+          sha256sum -c "$file.sha256"
+          mkdir -p "$HOME/oxispec"
+          tar -xJf "$file" -C "$HOME/oxispec" --strip-components=1
+          echo "$HOME/oxispec" >> "$GITHUB_PATH"
+      - run: oxispec check
+
+  js:
+    name: JavaScript (build and test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test
+
+  rust:
+    name: Rust (fmt, clippy, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+
+  swift:
+    name: Swift (build)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift build
