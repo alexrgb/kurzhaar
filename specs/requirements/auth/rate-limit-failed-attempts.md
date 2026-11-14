@@ -5,6 +5,7 @@ status: draft
 links:
   decided-by:
     - ADR-M1DT
+    - ADR-0GM5
 ---
 ### Requirement: Rate limit failed attempts
 The system SHALL limit repeated failed key checks per source and per key prefix.

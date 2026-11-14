@@ -5,6 +5,7 @@ status: draft
 links:
   decided-by:
     - ADR-WXH3
+    - ADR-83V0
 ---
 ### Requirement: Store identify ids hashed
 The system SHALL store identify ids only as an HMAC keyed with a per-site secret.

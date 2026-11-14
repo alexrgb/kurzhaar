@@ -5,6 +5,7 @@ status: draft
 links:
   decided-by:
     - ADR-M1DT
+    - ADR-0GM5
 ---
 ### Requirement: Revoke API keys
 The system SHALL let an administrator revoke an API key permanently.

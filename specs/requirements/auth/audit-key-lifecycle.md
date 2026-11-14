@@ -5,6 +5,7 @@ status: draft
 links:
   decided-by:
     - ADR-M1DT
+    - ADR-0GM5
 ---
 ### Requirement: Audit key lifecycle
 The system SHALL record creation, revocation and expiry of keys with actor and time.

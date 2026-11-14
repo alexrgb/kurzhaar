@@ -5,6 +5,8 @@ status: draft
 links:
   decided-by:
     - ADR-M1DT
+    - ADR-0GM5
+    - ADR-70F9
 ---
 ### Requirement: Close streams of revoked keys
 The system SHALL close open WebSocket connections that were authenticated with a key when the key is revoked.
