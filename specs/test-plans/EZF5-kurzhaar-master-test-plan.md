@@ -54,6 +54,7 @@ links:
     - REQ-TRACKER-N9BB
     - REQ-TRACKER-5AE5
     - REQ-TRACKER-4EHV
+    - REQ-TRACKER-2D61
     - REQ-PRIVACY-GEZF
     - REQ-METRICS-CHAM
     - REQ-METRICS-JEEQ
@@ -78,6 +79,7 @@ Every requirement scenario must be verified by at least one automated test that 
 - Conformance: the vectors in `spec/protocol` run by the TypeScript, Rust, Swift and Kotlin implementations.
 - Golden: the dataset in `spec/golden` is loaded into the API and dashboard clusters and every shared metric must match expected values.
 - Integration: collector, queue, consumers and ClickHouse in Docker, including redelivery and queue outage cases, for each supported queue.
+- Language: `pnpm typecheck` runs strict TypeScript checks in every package, and a CI step fails when a `.js`, `.mjs`, `.cjs` or `.jsx` source file is tracked (REQ-TRACKER-2D61).
 - Contract: each service is checked against its OpenAPI document.
 - Security: key revocation propagation (within 60 seconds), closing of streams for revoked keys, rate limiting of failed attempts, scope and site enforcement.
 - Privacy: inspection of events, queues and logs for IP addresses and raw identify ids; deletion across all three clusters.
