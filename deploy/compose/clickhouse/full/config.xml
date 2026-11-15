@@ -1,0 +1,28 @@
+<clickhouse>
+    <!-- Memory profile for the full profile (one of three ClickHouse servers). -->
+    <!-- Three servers share the host: keep each below a third of RAM. -->
+    <max_server_memory_usage_to_ram_ratio>0.3</max_server_memory_usage_to_ram_ratio>
+    <mark_cache_size>268435456</mark_cache_size>
+    <uncompressed_cache_size>0</uncompressed_cache_size>
+    <index_mark_cache_size>67108864</index_mark_cache_size>
+    <max_thread_pool_size>1000</max_thread_pool_size>
+    <background_pool_size>13</background_pool_size>
+    <background_schedule_pool_size>8</background_schedule_pool_size>
+    <background_move_pool_size>2</background_move_pool_size>
+    <background_fetches_pool_size>2</background_fetches_pool_size>
+    <background_common_pool_size>8</background_common_pool_size>
+    <max_concurrent_queries>50</max_concurrent_queries>
+    <!-- System log tables grow without bound and cost RAM and disk: keep only what is useful. -->
+    <asynchronous_metric_log remove="1"/>
+    <metric_log remove="1"/>
+    <trace_log remove="1"/>
+    <text_log remove="1"/>
+    <query_thread_log remove="1"/>
+    <opentelemetry_span_log remove="1"/>
+    <query_log>
+        <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+    </query_log>
+    <part_log>
+        <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+    </part_log>
+</clickhouse>

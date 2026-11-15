@@ -1,0 +1,218 @@
+# Kurzhaar infrastructure stack for local development and self-hosting.
+#
+# Profiles (select with --profile or COMPOSE_PROFILES in .env):
+#   minimal        one ClickHouse server hosting the RAW, API and dashboard
+#                  databases, Postgres, Redis as the queue
+#   full           three ClickHouse servers (RAW, API, dashboard) and Postgres;
+#                  add exactly one queue profile below
+#   queue-redis    Redis (Redis Streams)         -- used by "minimal" as well
+#   queue-kafka    Kafka (single-node KRaft)
+#   queue-rabbitmq RabbitMQ
+#
+# See deploy/README.md. Application services are not implemented yet; their
+# placeholders are at the bottom of this file and are commented out.
+
+name: kurzhaar
+
+x-clickhouse-common: &clickhouse-common
+  image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}
+  restart: unless-stopped
+  ulimits:
+    nofile:
+      soft: 262144
+      hard: 262144
+  healthcheck:
+    test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8123/ping || exit 1"]
+    interval: 10s
+    timeout: 5s
+    retries: 10
+    start_period: 20s
+
+services:
+  # ---------------------------------------------------------------- Postgres
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-17}-alpine
+    profiles: [minimal, full]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kurzhaar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kurzhaar_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-kurzhaar}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ------------------------------------------------- ClickHouse: minimal profile
+  # One server, three databases (kurzhaar_raw, kurzhaar_api, kurzhaar_dashboard),
+  # created by clickhouse/initdb/. Memory is capped by clickhouse/minimal/.
+  clickhouse:
+    <<: *clickhouse-common
+    profiles: [minimal]
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-kurzhaar}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-kurzhaar_dev}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${CH_HTTP_PORT:-8123}:8123"
+      - "${BIND_ADDRESS:-127.0.0.1}:${CH_NATIVE_PORT:-9000}:9000"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/minimal/config.xml:/etc/clickhouse-server/config.d/kurzhaar.xml:ro
+      - ./clickhouse/minimal/users.xml:/etc/clickhouse-server/users.d/kurzhaar.xml:ro
+      - ./clickhouse/initdb/minimal.sql:/docker-entrypoint-initdb.d/01-databases.sql:ro
+
+  # --------------------------------------------------- ClickHouse: full profile
+  # Three independent servers (ADR XET8). Each hosts one database.
+  clickhouse-raw:
+    <<: *clickhouse-common
+    profiles: [full]
+    environment:
+      CLICKHOUSE_DB: kurzhaar_raw
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-kurzhaar}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-kurzhaar_dev}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${CH_RAW_HTTP_PORT:-8123}:8123"
+      - "${BIND_ADDRESS:-127.0.0.1}:${CH_RAW_NATIVE_PORT:-9000}:9000"
+    volumes:
+      - clickhouse-raw-data:/var/lib/clickhouse
+      - ./clickhouse/full/config.xml:/etc/clickhouse-server/config.d/kurzhaar.xml:ro
+
+  clickhouse-api:
+    <<: *clickhouse-common
+    profiles: [full]
+    environment:
+      CLICKHOUSE_DB: kurzhaar_api
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-kurzhaar}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-kurzhaar_dev}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${CH_API_HTTP_PORT:-8124}:8123"
+      - "${BIND_ADDRESS:-127.0.0.1}:${CH_API_NATIVE_PORT:-9001}:9000"
+    volumes:
+      - clickhouse-api-data:/var/lib/clickhouse
+      - ./clickhouse/full/config.xml:/etc/clickhouse-server/config.d/kurzhaar.xml:ro
+
+  clickhouse-dashboard:
+    <<: *clickhouse-common
+    profiles: [full]
+    environment:
+      CLICKHOUSE_DB: kurzhaar_dashboard
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-kurzhaar}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-kurzhaar_dev}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${CH_DASHBOARD_HTTP_PORT:-8125}:8123"
+      - "${BIND_ADDRESS:-127.0.0.1}:${CH_DASHBOARD_NATIVE_PORT:-9002}:9000"
+    volumes:
+      - clickhouse-dashboard-data:/var/lib/clickhouse
+      - ./clickhouse/full/config.xml:/etc/clickhouse-server/config.d/kurzhaar.xml:ro
+
+  # ------------------------------------------------------------------ Queues
+  redis:
+    image: redis:${REDIS_VERSION:-7}-alpine
+    profiles: [minimal, queue-redis]
+    restart: unless-stopped
+    # AOF keeps the stream across restarts; the memory cap protects small hosts.
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-512mb}
+      - --maxmemory-policy
+      - noeviction
+      - --requirepass
+      - ${REDIS_PASSWORD:-kurzhaar_dev}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD:-kurzhaar_dev} --no-auth-warning ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-kurzhaar_dev}
+
+  kafka:
+    image: apache/kafka:${KAFKA_VERSION:-3.9.1}
+    profiles: [queue-kafka]
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      # INTERNAL is for other containers (kafka:9092), EXTERNAL for the host (localhost:9094).
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:${KAFKA_PORT:-9094}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS:--Xms256m -Xmx512m}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${KAFKA_PORT:-9094}:9094"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server 127.0.0.1:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  rabbitmq:
+    image: rabbitmq:${RABBITMQ_VERSION:-4}-management-alpine
+    profiles: [queue-rabbitmq]
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-kurzhaar}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-kurzhaar_dev}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${RABBITMQ_PORT:-5672}:5672"
+      - "${BIND_ADDRESS:-127.0.0.1}:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  # ------------------------------------------------- Application placeholders
+  # NOT IMPLEMENTED YET. No images exist for these services. When they do,
+  # uncomment, set the image, and make them depend_on the infrastructure above.
+  #
+  # collector:      # accepts tracker events, publishes to the queue
+  #   image: ghcr.io/alexrgb/kurzhaar-collector:TODO
+  #   profiles: [minimal, full]
+  #   depends_on: { postgres: { condition: service_healthy } }
+  # consumer:       # three consumers of one queue (ADR TDFQ): raw, api, dashboard
+  #   image: ghcr.io/alexrgb/kurzhaar-consumer:TODO
+  # public-api:     # public analytics API
+  # mcp:            # read-only MCP server
+  # stream:         # public WebSocket stream of raw events
+  # admin:          # admin app
+  # dashboard:      # dashboard app
+
+volumes:
+  postgres-data:
+  clickhouse-data:
+  clickhouse-raw-data:
+  clickhouse-api-data:
+  clickhouse-dashboard-data:
+  redis-data:
+  kafka-data:
+  rabbitmq-data:
