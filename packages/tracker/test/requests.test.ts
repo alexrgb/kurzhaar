@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { decode } from '@kurzhaar/protocol';
+import { loadRegistry } from '@kurzhaar/protocol/registry';
 import { transformSync } from 'esbuild';
 
 // The tracker is TypeScript; strip the types and run the result unminified.
@@ -59,7 +60,7 @@ function run(attrs: Record<string, string>, scenario: Scenario) {
   const query = (q: string) => { loc.href = 'https://acme.com' + loc.pathname + q; w.history.replaceState({}, '', loc.href); advance(1); };
   scenario({ advance, go, hide, query, lt: w.lt });
   const events = bodies.reduce((a, b) => a + decode(b).events.length, 0);
-  return { requests: bodies.length, events };
+  return { requests: bodies.length, events, bodies };
 }
 
 const spa: Scenario = ({ advance, go, hide, lt }) => {
@@ -70,7 +71,7 @@ const spa: Scenario = ({ advance, go, hide, lt }) => {
 
 test('bounce sends exactly one request with one event', () => {
   const r = run({ 'data-key': 'k' }, ({ advance, hide }) => { advance(2000); hide(); });
-  assert.deepEqual(r, { requests: 1, events: 1 });
+  assert.deepEqual({ requests: r.requests, events: r.events }, { requests: 1, events: 1 });
 });
 
 test('batching off sends one request per event', () => {
@@ -104,4 +105,19 @@ test('query-only changes do not create a pageview', () => {
     advance(10); query('?tab=2'); advance(10); query('?tab=3'); advance(10); hide();
   });
   assert.equal(r.events, 1);
+});
+
+// verifies: REQ-PROTOCOL-87M3 (every key the tracker writes is in the field registry)
+test('the tracker writes only keys that the registry lists', () => {
+  const registered = new Set(loadRegistry().fields.map((f) => f.key));
+  const r = run({ 'data-key': 'k' }, ({ advance, go, lt, hide }) => {
+    advance(10); lt.track('cta', { plan: 'pro' }); go('/pricing', 'P'); lt.identify('u1'); advance(4000); hide();
+  });
+  assert.ok(r.bodies.length > 0);
+  for (const body of r.bodies)
+    for (const line of body.split('\n'))
+      for (const part of line.split('|')) {
+        const key = part.slice(0, part.indexOf('::'));
+        assert.ok(registered.has(key) || (key.startsWith('p.') && registered.has('p.<name>')), `key "${key}" is not in contracts/protocol/fields.json`);
+      }
 });
