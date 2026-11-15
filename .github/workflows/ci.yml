@@ -67,3 +67,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: swift build
+
+  compose:
+    name: Compose (config validation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate every profile
+        working-directory: deploy/compose
+        run: |
+          cp .env.example .env
+          for profiles in minimal full,queue-redis full,queue-kafka full,queue-rabbitmq; do
+            echo "== $profiles"
+            COMPOSE_PROFILES="$profiles" docker compose config --quiet
+          done
