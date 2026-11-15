@@ -49,6 +49,9 @@ links:
     - REQ-COLLECT-QZRJ
     - REQ-COLLECT-H4Q0
     - REQ-PROTOCOL-1XV3
+    - REQ-PROTOCOL-87M3
+    - REQ-PROTOCOL-J5CJ
+    - REQ-PROTOCOL-1EDH
     - REQ-TRACKER-N7SJ
     - REQ-TRACKER-DYPM
     - REQ-TRACKER-N9BB
@@ -77,6 +80,7 @@ Every requirement scenario must be verified by at least one automated test that 
 
 - Unit: encoding and decoding, escaping, delta timestamps, scope checks, key hashing. Runs in each language's own test runner.
 - Conformance: the vectors in `contracts/protocol` run by the TypeScript, Rust, Swift and Kotlin implementations.
+- Registry: `contracts/protocol/fields.json` is checked against what each encoder and tracker writes and what each decoder handles, and `docs/protocol.md` is regenerated and compared (REQ-PROTOCOL-87M3, REQ-PROTOCOL-J5CJ, REQ-PROTOCOL-1EDH).
 - Golden: the dataset in `contracts/golden` is loaded into the API and dashboard clusters and every shared metric must match expected values.
 - Integration: collector, queue, consumers and ClickHouse in Docker, including redelivery and queue outage cases, for each supported queue.
 - Language: `pnpm typecheck` runs strict TypeScript checks in every package, and a CI step fails when a `.js`, `.mjs`, `.cjs` or `.jsx` source file is tracked (REQ-TRACKER-2D61).
