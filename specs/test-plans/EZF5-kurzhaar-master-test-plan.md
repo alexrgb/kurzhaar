@@ -3,7 +3,7 @@ id: TP-EZF5
 type: test-plan
 status: draft
 owner: alexrgb
-date: 2026-11-14
+date: 2026-11-15
 links:
   covers:
     - REQ-AUTH-ZDDT
@@ -46,12 +46,27 @@ links:
     - RISK-KA8M
     - RISK-QETX
     - RISK-WWXV
+    - REQ-COLLECT-QZRJ
+    - REQ-COLLECT-H4Q0
+    - REQ-PROTOCOL-1XV3
+    - REQ-TRACKER-N7SJ
+    - REQ-TRACKER-DYPM
+    - REQ-TRACKER-N9BB
+    - REQ-TRACKER-5AE5
+    - REQ-TRACKER-4EHV
+    - REQ-PRIVACY-GEZF
+    - REQ-METRICS-CHAM
+    - REQ-METRICS-JEEQ
+    - REQ-METRICS-C3TZ
+    - REQ-METRICS-R6AA
+    - RISK-RFN7
+    - RISK-HZNX
 ---
 # TP-EZF5: Kurzhaar master test plan
 
 ## Scope
 
-In scope for the first documented version: the wire protocol, the tracker, the collector, API key authentication, privacy guarantees and metric consistency between the API and dashboard clusters. Not yet covered: the admin and dashboard user interfaces, the WebSocket service, the MCP server, mobile SDKs and export of events older than 30 days (see the technical debt entry). Plans for those areas are added when their requirements are written.
+In scope for the first documented version: the wire protocol, the tracker (including engagement, automatic events and Web Vitals), the collector (including device classes and campaign fields), visit metrics, API key authentication, privacy guarantees and metric consistency between the API and dashboard clusters. Not yet covered: the admin and dashboard user interfaces, the WebSocket service, the MCP server, mobile SDKs and export of events older than 30 days (see the technical debt entry). Plans for those areas are added when their requirements are written.
 
 ## Approach
 
@@ -66,6 +81,7 @@ Every requirement scenario must be verified by at least one automated test that 
 - Contract: each service is checked against its OpenAPI document.
 - Security: key revocation propagation (within 60 seconds), closing of streams for revoked keys, rate limiting of failed attempts, scope and site enforcement.
 - Privacy: inspection of events, queues and logs for IP addresses and raw identify ids; deletion across all three clusters.
+- Visits: the golden dataset gets sessions with gaps of 29 and 31 minutes, a salt rotation, a bounce and a three page visit; the same expectations run for every consumer.
 - Performance: throughput and latency targets (for example 20,000 events per second at the collector) are goals that must be measured on defined hardware before they are claimed.
 
 ## Environments
