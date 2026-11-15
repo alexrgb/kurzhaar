@@ -19,14 +19,14 @@ One repository, organized by artifact type:
 - `packages/`: shared TypeScript packages (tracker, protocol, api-clients).
 - `sdks/`: public SDKs (react, node, react-native, flutter, ios, android).
 - `schema/`: ClickHouse migrations and metric templates.
-- `spec/`: cross-language contracts (protocol vectors, generated OpenAPI, golden datasets).
+- `contracts/`: cross-language contracts (protocol vectors, generated OpenAPI, golden datasets).
 - `deploy/`: Docker, compose profiles and the reverse proxy.
 
-Tooling: pnpm and Turborepo for TypeScript, a Cargo workspace for Rust, a root `Package.swift` pointing to `sdks/ios` for Swift Package Manager. Services depend on crates but not on each other; apps depend on generated API clients, never on Rust code. Languages share only `spec/`.
+Tooling: pnpm and Turborepo for TypeScript, a Cargo workspace for Rust, a root `Package.swift` pointing to `sdks/ios` for Swift Package Manager. Services depend on crates but not on each other; apps depend on generated API clients, never on Rust code. Languages share only `contracts/`.
 
 ## Consequences
 
 - One pull request can change a contract and all its consumers.
 - CI needs path filters so a tracker change does not rebuild the Rust workspace.
 - Releases use per-component tags; Swift Package Manager requires plain semver tags for the iOS SDK, which must be verified at the first release (a mirror repository is the fallback).
-- Two build systems coexist; Docker and `spec/` are the only meeting points.
+- Two build systems coexist; Docker and `contracts/` are the only meeting points.

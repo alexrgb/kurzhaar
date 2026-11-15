@@ -11,7 +11,7 @@ The platform exposes a Rust public API (analytics, export, key validation), a Ne
 
 ## Decision
 
-Each service owns and publishes its own OpenAPI document: `public-api` (generated from Rust), `admin-api` and `dashboard-api` (generated from NestJS). The documents are collected under `spec/openapi/`. Typed clients for each are generated into `packages/api-clients`. A reverse proxy routes by path prefix so that integrators see one host, but three contracts.
+Each service owns and publishes its own OpenAPI document: `public-api` (generated from Rust), `admin-api` and `dashboard-api` (generated from NestJS). The documents are collected under `contracts/openapi/`. Typed clients for each are generated into `packages/api-clients`. A reverse proxy routes by path prefix so that integrators see one host, but three contracts.
 
 ## Consequences
 

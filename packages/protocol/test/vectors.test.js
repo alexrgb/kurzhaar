@@ -1,9 +1,9 @@
-// verifies: conformance of the reference decoder with spec/protocol/vectors.json
+// verifies: conformance of the reference decoder with contracts/protocol/vectors.json
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { decode } = require('../src/decode.js');
-const { vectors } = require(path.join(__dirname, '../../../spec/protocol/vectors.json'));
+const { vectors } = require(path.join(__dirname, '../../../contracts/protocol/vectors.json'));
 
 for (const v of vectors) {
   test(v.name, () => {

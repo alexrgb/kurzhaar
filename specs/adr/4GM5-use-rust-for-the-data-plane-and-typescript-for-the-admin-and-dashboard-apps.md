@@ -18,6 +18,6 @@ Event collection, queue consumption, the public API, the MCP server and the stre
 ## Consequences
 
 - Hot paths are efficient and deployable as small binaries.
-- Two ecosystems to maintain; shared logic must go through contracts (`spec/`, OpenAPI), not shared code.
+- Two ecosystems to maintain; shared logic must go through contracts (`contracts/`, OpenAPI), not shared code.
 - Metric definitions must not be reimplemented in both languages (see the metrics ADR).
 - Contributors need Rust and TypeScript skills depending on the area.

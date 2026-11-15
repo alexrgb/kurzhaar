@@ -33,7 +33,7 @@ CLICKHOUSE_URL=http://127.0.0.1:8123 node src/cli.ts migrate api
 
 ## Tests
 
-`pnpm test` runs the render tests. With `CLICKHOUSE_URL` set it also loads the golden dataset (`spec/golden`) into the api and dashboard databases, compares every case with the expected values, and checks that a batch inserted twice with one deduplication token is counted once.
+`pnpm test` runs the render tests. With `CLICKHOUSE_URL` set it also loads the golden dataset (`contracts/golden`) into the api and dashboard databases, compares every case with the expected values, and checks that a batch inserted twice with one deduplication token is counted once.
 
 ## Not done yet
 

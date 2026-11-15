@@ -1,7 +1,7 @@
 //! Decoder for the Kurzhaar wire format v1.
 //!
 //! One event per line, fields as `key::value` joined by `|`. The first line is the batch
-//! header. See `spec/protocol/vectors.json` for the conformance vectors.
+//! header. See `contracts/protocol/vectors.json` for the conformance vectors.
 
 use serde::Serialize;
 use std::collections::BTreeMap;

@@ -1,11 +1,11 @@
-//! Conformance with `spec/protocol/vectors.json` (the same vectors the TypeScript decoder passes).
+//! Conformance with `contracts/protocol/vectors.json` (the same vectors the TypeScript decoder passes).
 
 use kurzhaar_protocol::decode;
 use serde_json::Value;
 
 #[test]
 fn passes_shared_vectors() {
-    let raw = include_str!("../../../spec/protocol/vectors.json");
+    let raw = include_str!("../../../contracts/protocol/vectors.json");
     let doc: Value = serde_json::from_str(raw).unwrap();
     let vectors = doc["vectors"].as_array().unwrap();
     assert!(!vectors.is_empty());

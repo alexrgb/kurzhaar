@@ -10,5 +10,5 @@ links:
 The system SHALL pass the same set of encoding and decoding test vectors in every implementation language.
 
 #### Scenario: Vectors in CI {#S1}
-- **WHEN** the TypeScript, Rust, Swift and Kotlin implementations run the vectors in spec/protocol
+- **WHEN** the TypeScript, Rust, Swift and Kotlin implementations run the vectors in contracts/protocol
 - **THEN** all implementations produce identical results for every vector
