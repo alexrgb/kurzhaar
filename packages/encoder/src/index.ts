@@ -3,12 +3,13 @@
 //   v::1|k::<key>|s::<WxH>|l::<lang>|i::<id>      line 1: batch header
 //   ts::<epoch ms>|u::/|t::Title|r::ref            first event: full timestamp
 //   d::4000|y::1|n::signup|p.plan::pro             later events: delta ms from the previous event
+//   d::8000|y::3|u::/|et::7500|sc::80              engagement; y::4 carries lcp/inp/cls/fcp/ttfb (ADR-B0B4)
 //
 // The decoder reference lives in @kurzhaar/protocol; the browser tracker keeps its own
 // inline encoder to stay tiny and is intentionally not built on this package.
 
-/** Event type: 0 pageview (omitted on the wire), 1 custom event, 2 identify. */
-export type EventType = 0 | 1 | 2;
+/** Event type: 0 pageview (omitted on the wire), 1 custom event, 2 identify, 3 engagement, 4 performance. */
+export type EventType = 0 | 1 | 2 | 3 | 4;
 
 /** A property value. Booleans become 1/0, objects JSON, null/undefined/"" are dropped. */
 export type PropValue = string | number | boolean | null | undefined | object;
@@ -33,6 +34,15 @@ export interface WireEvent {
   url?: string;
   title?: string;
   referrer?: string;
+  /** Type 3: engaged time in ms (`et`) and maximum scroll percent 0-100 (`sc`). */
+  engagedMs?: number;
+  scrollPct?: number;
+  /** Type 4: Web Vitals (`lcp`, `inp`, `fcp`, `ttfb` in ms, `cls` unitless). Absent values are omitted. */
+  lcp?: number;
+  inp?: number;
+  cls?: number;
+  fcp?: number;
+  ttfb?: number;
   props?: Record<string, PropValue>;
 }
 
@@ -88,6 +98,13 @@ export function encodeEvents(events: readonly WireEvent[]): string[] {
       field('u', e.url),
       field('t', e.title),
       field('r', e.referrer),
+      field('et', e.engagedMs),
+      field('sc', e.scrollPct),
+      field('lcp', e.lcp),
+      field('inp', e.inp),
+      field('cls', e.cls),
+      field('fcp', e.fcp),
+      field('ttfb', e.ttfb),
     ];
     prev = e.ts;
     for (const k of Object.keys(e.props ?? {})) {

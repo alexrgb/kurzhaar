@@ -74,6 +74,57 @@
       }
     },
     {
+      "name": "engagement event",
+      "body": "v::1|k::abc\nts::1000|u::/\nd::8000|y::3|u::/|et::7500|sc::80",
+      "expected": {
+        "key": "abc",
+        "events": [
+          {"ts": 1000, "type": 0, "url": "/", "props": {}},
+          {"ts": 9000, "type": 3, "url": "/", "engagedMs": 7500, "scrollPct": 80, "props": {}}
+        ]
+      }
+    },
+    {
+      "name": "engagement without scroll",
+      "body": "v::1|k::abc\nts::1000|y::3|u::/|et::300",
+      "expected": {
+        "key": "abc",
+        "events": [
+          {"ts": 1000, "type": 3, "url": "/", "engagedMs": 300, "props": {}}
+        ]
+      }
+    },
+    {
+      "name": "performance event",
+      "body": "v::1|k::abc\nts::1000|y::4|u::/|lcp::1800|inp::120|cls::0.05|fcp::900|ttfb::200",
+      "expected": {
+        "key": "abc",
+        "events": [
+          {"ts": 1000, "type": 4, "url": "/", "lcp": 1800, "inp": 120, "cls": 0.05, "fcp": 900, "ttfb": 200, "props": {}}
+        ]
+      }
+    },
+    {
+      "name": "performance event omits absent values",
+      "body": "v::1|k::abc\nts::1000|y::4|u::/|lcp::2500|ttfb::180",
+      "expected": {
+        "key": "abc",
+        "events": [
+          {"ts": 1000, "type": 4, "url": "/", "lcp": 2500, "ttfb": 180, "props": {}}
+        ]
+      }
+    },
+    {
+      "name": "engaged time must be a number",
+      "body": "v::1|k::abc\nts::1000|y::3|u::/|et::abc",
+      "error": "invalid number: abc"
+    },
+    {
+      "name": "milliseconds must be whole numbers",
+      "body": "v::1|k::abc\nts::1000|y::4|u::/|lcp::12.5",
+      "error": "invalid number: 12.5"
+    },
+    {
       "name": "unsupported version",
       "body": "v::9|k::abc\nts::10|u::/",
       "error": "unsupported protocol version"

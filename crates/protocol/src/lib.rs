@@ -6,7 +6,7 @@
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Event {
     pub ts: u64,
     #[serde(rename = "type")]
@@ -20,9 +20,28 @@ pub struct Event {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub referrer: Option<String>,
     pub props: BTreeMap<String, String>,
+    /// `y::3` engagement: engaged time in ms (`et`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "engagedMs")]
+    pub engaged_ms: Option<u32>,
+    /// `y::3` engagement: maximum scroll percent (`sc`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "scrollPct")]
+    pub scroll_pct: Option<u8>,
+    /// `y::4` performance: Web Vitals (ms, `cls` unitless).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lcp: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inp: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cls: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fcp: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ttfb: Option<u32>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Batch {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
@@ -131,6 +150,13 @@ pub fn decode(body: &str) -> Result<Batch, DecodeError> {
             title: find("t").map(String::from),
             referrer: find("r").map(String::from),
             props,
+            engaged_ms: find("et").map(num::<u32>).transpose()?,
+            scroll_pct: find("sc").map(num::<u8>).transpose()?,
+            lcp: find("lcp").map(num::<u32>).transpose()?,
+            inp: find("inp").map(num::<u32>).transpose()?,
+            cls: find("cls").map(num::<f64>).transpose()?,
+            fcp: find("fcp").map(num::<u32>).transpose()?,
+            ttfb: find("ttfb").map(num::<u32>).transpose()?,
         });
     }
 
