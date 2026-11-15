@@ -1,0 +1,17 @@
+{
+  "raw": {
+    "database": "kurzhaar_raw",
+    "params": { "ttl": "" },
+    "templates": ["events"]
+  },
+  "api": {
+    "database": "kurzhaar_api",
+    "params": { "ttl": "TTL toDateTime(ts) + INTERVAL 30 DAY" },
+    "templates": ["events", "traffic_hourly", "pages_daily", "referrers_daily", "countries_daily"]
+  },
+  "dashboard": {
+    "database": "kurzhaar_dashboard",
+    "params": { "ttl": "TTL toDateTime(ts) + INTERVAL 30 DAY" },
+    "templates": ["events", "traffic_hourly", "pages_daily", "referrers_daily", "countries_daily"]
+  }
+}

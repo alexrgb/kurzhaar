@@ -1,0 +1,18 @@
+{
+  "name": "@kurzhaar/schema",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Renders ClickHouse schema from SQL templates and applies it; also runs the golden dataset checks",
+  "type": "module",
+  "bin": { "kurzhaar-schema": "src/cli.ts" },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "node --test test/*.test.ts",
+    "migrate": "node src/cli.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.3"
+  }
+}

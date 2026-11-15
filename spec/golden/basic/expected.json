@@ -1,0 +1,87 @@
+{
+  "description": "Hand-computed from events.ndjson. Times are UTC. Ranges are [from, to).",
+  "rawEventCount": 16,
+  "cases": [
+    {
+      "name": "totals, both days",
+      "query": "totals",
+      "params": { "site": "acme", "from": "2026-03-01 00:00:00", "to": "2026-03-03 00:00:00" },
+      "rows": [{ "views": 10, "custom_events": 3, "visitors": 5 }],
+      "note": "session s4 is seen on both days and counts once over the range"
+    },
+    {
+      "name": "totals, first day",
+      "query": "totals",
+      "params": { "site": "acme", "from": "2026-03-01 00:00:00", "to": "2026-03-02 00:00:00" },
+      "rows": [{ "views": 8, "custom_events": 1, "visitors": 4 }]
+    },
+    {
+      "name": "totals, second day",
+      "query": "totals",
+      "params": { "site": "acme", "from": "2026-03-02 00:00:00", "to": "2026-03-03 00:00:00" },
+      "rows": [{ "views": 2, "custom_events": 2, "visitors": 2 }]
+    },
+    {
+      "name": "totals, other site is isolated",
+      "query": "totals",
+      "params": { "site": "other", "from": "2026-03-01 00:00:00", "to": "2026-03-03 00:00:00" },
+      "rows": [{ "views": 2, "custom_events": 0, "visitors": 1 }]
+    },
+    {
+      "name": "totals, unknown site",
+      "query": "totals",
+      "params": { "site": "nobody", "from": "2026-03-01 00:00:00", "to": "2026-03-03 00:00:00" },
+      "rows": [{ "views": 0, "custom_events": 0, "visitors": 0 }]
+    },
+    {
+      "name": "traffic by hour",
+      "query": "traffic_by_hour",
+      "params": { "site": "acme", "from": "2026-03-01 00:00:00", "to": "2026-03-03 00:00:00" },
+      "rows": [
+        { "hour": "2026-03-01 10:00:00", "views": 3, "custom_events": 1, "visitors": 2 },
+        { "hour": "2026-03-01 11:00:00", "views": 4, "custom_events": 0, "visitors": 2 },
+        { "hour": "2026-03-01 23:00:00", "views": 1, "custom_events": 0, "visitors": 1 },
+        { "hour": "2026-03-02 00:00:00", "views": 1, "custom_events": 0, "visitors": 1 },
+        { "hour": "2026-03-02 09:00:00", "views": 1, "custom_events": 2, "visitors": 1 }
+      ],
+      "note": "10:59:59.999 falls in hour 10 and 11:00:00.000 in hour 11"
+    },
+    {
+      "name": "top pages",
+      "query": "top_pages",
+      "params": { "site": "acme", "from": "2026-03-01 00:00:00", "to": "2026-03-03 00:00:00", "limit": 10 },
+      "rows": [
+        { "path": "/pricing", "views": 5, "visitors": 5 },
+        { "path": "/", "views": 3, "visitors": 3 },
+        { "path": "/docs", "views": 2, "visitors": 2 }
+      ]
+    },
+    {
+      "name": "top pages respects limit",
+      "query": "top_pages",
+      "params": { "site": "acme", "from": "2026-03-01 00:00:00", "to": "2026-03-03 00:00:00", "limit": 1 },
+      "rows": [{ "path": "/pricing", "views": 5, "visitors": 5 }]
+    },
+    {
+      "name": "top referrers",
+      "query": "top_referrers",
+      "params": { "site": "acme", "from": "2026-03-01 00:00:00", "to": "2026-03-03 00:00:00", "limit": 10 },
+      "rows": [
+        { "referrer": "google.com/", "views": 3, "visitors": 3 },
+        { "referrer": "news.ycombinator.com/", "views": 1, "visitors": 1 }
+      ],
+      "note": "direct visits and internal navigation are not referrers"
+    },
+    {
+      "name": "top countries",
+      "query": "top_countries",
+      "params": { "site": "acme", "from": "2026-03-01 00:00:00", "to": "2026-03-03 00:00:00", "limit": 10 },
+      "rows": [
+        { "country": "UA", "views": 4, "visitors": 2 },
+        { "country": "DE", "views": 3, "visitors": 2 },
+        { "country": "US", "views": 3, "visitors": 1 }
+      ],
+      "note": "views tie between DE and US, so they are ordered by name"
+    }
+  ]
+}
