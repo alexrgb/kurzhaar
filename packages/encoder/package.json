@@ -1,0 +1,27 @@
+{
+  "name": "@kurzhaar/encoder",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Pure TypeScript encoder for the Kurzhaar wire format v1 (for server-side SDKs)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p .",
+    "test": "node --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "@kurzhaar/protocol": "workspace:*",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.3"
+  }
+}
