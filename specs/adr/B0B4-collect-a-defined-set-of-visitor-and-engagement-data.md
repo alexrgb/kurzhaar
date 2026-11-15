@@ -17,7 +17,7 @@ We compared what Umami, Plausible, Google Analytics 4, Matomo, PostHog and Sentr
 
 Added to the first release:
 
-- Browser name, operating system and device class (desktop, mobile, tablet, other), derived by the collector from the User-Agent. Only major versions are kept. The raw User-Agent is discarded before the event is queued.
+- Browser name, operating system and device class (desktop, mobile, tablet, other), derived by the collector from the User-Agent and client signals (ADR-ZKD1). Only major versions are kept. The raw User-Agent is discarded before the event is queued.
 - Campaign data as separate fields: `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content` and the click identifiers `gclid`, `fbclid`, `msclkid`, `ttclid`, `li_fat_id`, `twclid`. The collector extracts them from the page URL the tracker sends; the tracker keeps sending only those query parameters (ADR WXH3).
 - Engagement: when a page is left, the tracker sends an engagement event with the engaged time in milliseconds and the maximum scroll depth in percent.
 - Automatic events, sent as custom events with reserved names: `$outbound` (link to another origin, property `url`), `$download` (link to a file with a common extension, properties `url` and `file`) and `$search` (site search, property `term`). Each can be switched off by a script attribute.
