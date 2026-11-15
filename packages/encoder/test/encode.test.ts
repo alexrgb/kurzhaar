@@ -10,7 +10,7 @@ interface Decoded {
   screen?: string;
   lang?: string;
   identity?: string;
-  events: { ts: number; type: number; name?: string; url?: string; title?: string; referrer?: string; props: Record<string, string> }[];
+  events: { ts: number; type: number; name?: string; url?: string; title?: string; referrer?: string; props: Record<string, string>; engagedMs?: number; scrollPct?: number; lcp?: number; inp?: number; cls?: number; fcp?: number; ttfb?: number }[];
 }
 interface Vector {
   name: string;
