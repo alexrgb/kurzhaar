@@ -21,7 +21,7 @@ Wire format version 1 is plain text, one event per line, sent as `text/plain` (n
 - Escaping: `%`, `|`, CR and LF become `%XX`; property names also escape `:`. Fields split on the first `::`.
 - The version is the first field of every batch.
 
-A reference decoder and shared test vectors live in `contracts/protocol` and are run by every implementation.
+A reference decoder and shared test vectors live in `contracts/protocol` and are run by every implementation. The full list of keys is the field registry `contracts/protocol/fields.json` (ADR-VJGJ); the short keys above are the original set.
 
 ## Consequences
 
