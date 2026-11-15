@@ -11,7 +11,7 @@ import { SCHEMA_DIR, loadTargets, renderQuery } from '../src/render.ts';
 
 const skip = process.env.CLICKHOUSE_URL ? false : 'CLICKHOUSE_URL is not set';
 const targets = loadTargets();
-const dir = join(SCHEMA_DIR, '..', 'spec', 'golden', 'basic');
+const dir = join(SCHEMA_DIR, '..', 'contracts', 'golden', 'basic');
 const events = readFileSync(join(dir, 'events.ndjson'), 'utf8').trim().split('\n').map((l) => JSON.parse(l) as object);
 const expected = JSON.parse(readFileSync(join(dir, 'expected.json'), 'utf8')) as {
   rawEventCount: number;

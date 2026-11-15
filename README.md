@@ -13,7 +13,7 @@ Light, privacy-first, self-hosted web and product analytics. MIT licensed.
 | `crates/` | Shared Rust libraries; `protocol` already decodes wire format v1 |
 | `packages/` | `tracker` (browser tracker prototype), `protocol` (reference decoder) |
 | `sdks/` | React, Node, React Native, Flutter, iOS, Android (placeholders) |
-| `schema/`, `spec/`, `deploy/` | ClickHouse schema, cross-language contracts, Docker (see [`deploy/README.md`](deploy/README.md) for the compose stack) |
+| `schema/`, `contracts/`, `deploy/` | ClickHouse schema, cross-language contracts, Docker (see [`deploy/README.md`](deploy/README.md) for the compose stack) |
 | `specs/`, `docs/` | oxispec nodes: ADRs, requirements, test plan, risks |
 
 ## Develop
@@ -27,4 +27,4 @@ swift build    # iOS SDK placeholder through the root Package.swift
 oxispec check  # documentation checks
 ```
 
-The protocol vectors in `spec/protocol/vectors.json` are run by both the TypeScript and the Rust decoder.
+The protocol vectors in `contracts/protocol/vectors.json` are run by both the TypeScript and the Rust decoder.

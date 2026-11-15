@@ -75,8 +75,8 @@ Every requirement scenario must be verified by at least one automated test that 
 ## Levels
 
 - Unit: encoding and decoding, escaping, delta timestamps, scope checks, key hashing. Runs in each language's own test runner.
-- Conformance: the vectors in `spec/protocol` run by the TypeScript, Rust, Swift and Kotlin implementations.
-- Golden: the dataset in `spec/golden` is loaded into the API and dashboard clusters and every shared metric must match expected values.
+- Conformance: the vectors in `contracts/protocol` run by the TypeScript, Rust, Swift and Kotlin implementations.
+- Golden: the dataset in `contracts/golden` is loaded into the API and dashboard clusters and every shared metric must match expected values.
 - Integration: collector, queue, consumers and ClickHouse in Docker, including redelivery and queue outage cases, for each supported queue.
 - Contract: each service is checked against its OpenAPI document.
 - Security: key revocation propagation (within 60 seconds), closing of streams for revoked keys, rate limiting of failed attempts, scope and site enforcement.

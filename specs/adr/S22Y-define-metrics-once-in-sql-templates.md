@@ -11,7 +11,7 @@ The public API (Rust) and the dashboard (TypeScript) read analytics from differe
 
 ## Decision
 
-Metric definitions (views, visitors, sessions, bounce and others) live in SQL templates in `schema/templates/`. The migration tool generates the materialized views and rollup tables for the API and dashboard clusters from the same templates. Application code only reads rollups and applies filters, sorting and pagination. A shared golden dataset in `spec/golden/` with expected results is run in CI against both clusters and must give identical numbers.
+Metric definitions (views, visitors, sessions, bounce and others) live in SQL templates in `schema/templates/`. The migration tool generates the materialized views and rollup tables for the API and dashboard clusters from the same templates. Application code only reads rollups and applies filters, sorting and pagination. A shared golden dataset in `contracts/golden/` with expected results is run in CI against both clusters and must give identical numbers.
 
 ## Consequences
 

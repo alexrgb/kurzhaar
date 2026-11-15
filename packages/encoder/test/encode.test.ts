@@ -18,7 +18,7 @@ interface Vector {
   expected?: Decoded;
   error?: string;
 }
-const { vectors } = JSON.parse(readFileSync(new URL('../../../spec/protocol/vectors.json', import.meta.url), 'utf8')) as {
+const { vectors } = JSON.parse(readFileSync(new URL('../../../contracts/protocol/vectors.json', import.meta.url), 'utf8')) as {
   vectors: Vector[];
 };
 

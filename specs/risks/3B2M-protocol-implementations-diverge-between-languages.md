@@ -29,4 +29,4 @@ Corrupted or dropped events from some clients, hard to diagnose.
 
 ## What is done about it
 
-A shared set of test vectors in spec/protocol must pass in every implementation in CI.
+A shared set of test vectors in contracts/protocol must pass in every implementation in CI.
