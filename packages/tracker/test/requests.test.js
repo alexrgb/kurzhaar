@@ -7,7 +7,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { decode } = require('@kurzhaar/protocol');
 
-const code = fs.readFileSync(path.join(__dirname, '../src/tracker.js'), 'utf8');
+const { transformSync } = require('esbuild');
+
+// The tracker is TypeScript; strip the types and run the result unminified.
+const code = transformSync(fs.readFileSync(path.join(__dirname, '../src/tracker.ts'), 'utf8'), { loader: 'ts' }).code;
 
 function run(attrs, scenario) {
   let clock = 1731150000000, timers = [], id = 0;

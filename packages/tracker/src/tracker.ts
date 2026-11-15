@@ -3,9 +3,25 @@
 // data-auto ("false" disables automatic page views), data-dnt ("true" honours Do Not Track),
 // data-batch ("false" sends every event immediately; default on: the first event goes out at once,
 // the rest are buffered), data-batch-ms (buffer window after the first event, default 3000)
-(function (w, d) {
-  var s = d.currentScript;
-  if (!s) return;
+type Props = Record<string, unknown>;
+interface Ev {
+  y: number;
+  ts: number;
+  n?: string;
+  u?: string;
+  t?: string;
+  r?: string;
+  p?: Props;
+}
+interface Lt {
+  track(name: string, props?: Props): void;
+  identify(id: string, traits?: Props): void;
+  flush(): void;
+}
+(function (w: Window & { lt?: Lt }, d: Document) {
+  var cur = d.currentScript as HTMLScriptElement | null;
+  if (!cur) return;
+  var s: HTMLScriptElement = cur;
   var key = s.getAttribute('data-key');
   if (!key) return;
   var host = (s.getAttribute('data-host') || s.src.replace(/\/[^/]*$/, '')).replace(/\/$/, '');
@@ -13,22 +29,26 @@
   var queryMode = s.getAttribute('data-query');
   var h = w.history, loc = w.location, nav = w.navigator;
   var batch = s.getAttribute('data-batch') !== 'false';
-  var win = +s.getAttribute('data-batch-ms') || 3000;
-  var q = [], timer, ident, lastPath = null, sent = 0;
+  var win = Number(s.getAttribute('data-batch-ms')) || 3000;
+  var q: Ev[] = [],
+    timer: ReturnType<typeof setTimeout> | 0 = 0,
+    ident: string | undefined,
+    lastPath: string | null = null,
+    sent = 0;
 
   // Query params kept by default; everything else is stripped client-side (may contain tokens or emails).
   var KEEP = /^(utm_\w+|gclid|fbclid|msclkid|ttclid|twclid|li_fat_id|ref)$/;
 
-  function off() {
+  function off(): boolean {
     try {
-      if (w.localStorage.getItem('lt.off')) return 1;
+      if (w.localStorage.getItem('lt.off')) return true;
     } catch (e) {}
     return s.getAttribute('data-dnt') === 'true' && nav.doNotTrack === '1';
   }
 
-  function clean(u) {
+  function clean(href: string): URL | null {
     try {
-      u = new URL(u, loc.href);
+      var u = new URL(href, loc.href);
       if (queryMode !== 'all') {
         var p = new URLSearchParams();
         if (queryMode !== 'none')
@@ -50,21 +70,21 @@
   //   d::4000|y::1|n::signup|u::/pricing|p.plan::pro     <- next events: delta ms since the previous event
   // y: 0 pageview (default, omitted), 1 custom event, 2 identify. Booleans are sent as 1/0.
   // Escaping (values and prop names): % | \n \r -> %XX; prop names also escape ":".
-  function esc(v) {
+  function esc(v: unknown): string {
     return String(v).replace(/[%|\n\r]/g, function (c) {
       return '%' + ('0' + c.charCodeAt(0).toString(16)).slice(-2).toUpperCase();
     });
   }
 
-  function val(v) {
+  function val(v: unknown): unknown {
     return v === true ? 1 : v === false ? 0 : typeof v === 'object' ? JSON.stringify(v) : v;
   }
 
-  function pair(k, v) {
+  function pair(k: string, v: unknown): string {
     return v == null || v === '' ? '' : k + '::' + esc(val(v));
   }
 
-  function encode(events) {
+  function encode(events: Ev[]): string {
     var head = ['v::1', pair('k', key), pair('s', d.documentElement.clientWidth + 'x' + d.documentElement.clientHeight), pair('l', nav.language), pair('i', ident)];
     var lines = [head.filter(Boolean).join('|')];
     var prev = 0;
@@ -77,10 +97,13 @@
     return lines.join('\n');
   }
 
-  function flush() {
-    clearTimeout(timer);
+  function flush(): void {
+    clearTimeout(timer || undefined);
     timer = 0;
-    if (!q.length || off()) return (q = []);
+    if (!q.length || off()) {
+      q = [];
+      return;
+    }
     var body = encode(q);
     q = [];
     sent = 1;
@@ -92,16 +115,16 @@
     }
   }
 
-  function push(ev) {
-    ev.ts = Date.now();
-    q.push(ev);
+  function push(ev: Omit<Ev, 'ts'>): void {
+    (ev as Ev).ts = Date.now();
+    q.push(ev as Ev);
     // Leading edge: the first event of a page load is sent at once (it is the most valuable one),
     // later events wait up to `win` ms, or until 20 are queued, or the page is hidden.
     if (!batch || !sent || q.length >= 20) flush();
     else if (!timer) timer = setTimeout(flush, win);
   }
 
-  function view(ref) {
+  function view(ref?: string): void {
     var u = clean(loc.href);
     if (!u) return;
     var path = u.pathname;
@@ -112,16 +135,16 @@
     push({ y: 0, u: path + u.search, t: d.title, r: prev === null ? ref : prev });
   }
 
-  function track(name, props) {
+  function track(name: string, props?: Props): void {
     push({ y: 1, n: String(name).slice(0, 64), u: loc.pathname, p: props });
   }
 
-  function identify(id, traits) {
+  function identify(id: string, traits?: Props): void {
     ident = String(id).slice(0, 64);
     push({ y: 2, p: traits });
   }
 
-  function refOf(u) {
+  function refOf(u: string): string {
     try {
       var r = new URL(u);
       return r.origin === loc.origin ? r.pathname : r.origin + r.pathname;
@@ -130,10 +153,10 @@
     }
   }
 
-  function hook(m) {
+  function hook(m: 'pushState' | 'replaceState'): void {
     var orig = h[m];
-    h[m] = function () {
-      var out = orig.apply(this, arguments);
+    h[m] = function (this: History) {
+      var out = orig.apply(this, arguments as unknown as Parameters<typeof orig>);
       // Defer so the router can update document.title before we read it.
       setTimeout(view, 0);
       return out;
@@ -155,13 +178,14 @@
   d.addEventListener(
     'click',
     function (e) {
-      var el = e.target && e.target.closest && e.target.closest('[data-lt-event]');
+      var t = e.target as Element | null;
+      var el = t && t.closest && t.closest('[data-lt-event]');
       if (!el) return;
-      var p = {};
+      var p: Props = {};
       for (var i = 0, a = el.attributes; i < a.length; i++) {
         if (a[i].name.indexOf('data-lt-') === 0 && a[i].name !== 'data-lt-event') p[a[i].name.slice(8)] = a[i].value;
       }
-      track(el.getAttribute('data-lt-event'), p);
+      track(el.getAttribute('data-lt-event') as string, p);
     },
     true
   );
