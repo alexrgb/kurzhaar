@@ -52,6 +52,10 @@ links:
     - REQ-PROTOCOL-87M3
     - REQ-PROTOCOL-J5CJ
     - REQ-PROTOCOL-1EDH
+    - REQ-COLLECT-BCES
+    - REQ-COLLECT-X6WF
+    - REQ-COLLECT-4THR
+    - REQ-COLLECT-RA57
     - REQ-TRACKER-N7SJ
     - REQ-TRACKER-DYPM
     - REQ-TRACKER-N9BB
@@ -65,6 +69,8 @@ links:
     - REQ-METRICS-R6AA
     - RISK-RFN7
     - RISK-HZNX
+    - RISK-D66S
+    - RISK-K28G
 ---
 # TP-EZF5: Kurzhaar master test plan
 
@@ -81,6 +87,7 @@ Every requirement scenario must be verified by at least one automated test that 
 - Unit: encoding and decoding, escaping, delta timestamps, scope checks, key hashing. Runs in each language's own test runner.
 - Conformance: the vectors in `contracts/protocol` run by the TypeScript, Rust, Swift and Kotlin implementations.
 - Registry: `contracts/protocol/fields.json` is checked against what each encoder and tracker writes and what each decoder handles, and `docs/protocol.md` is regenerated and compared (REQ-PROTOCOL-87M3, REQ-PROTOCOL-J5CJ, REQ-PROTOCOL-1EDH).
+- Device detection: a vector set of real User-Agents and client signals (Windows 10 and 11, iPad in desktop mode, Android phone and tablet, Safari and Firefox without hints, bots) is run against the default detector and against any other implementation (REQ-COLLECT-X6WF), plus a check that queued events hold no raw signals (REQ-COLLECT-RA57).
 - Golden: the dataset in `contracts/golden` is loaded into the API and dashboard clusters and every shared metric must match expected values.
 - Integration: collector, queue, consumers and ClickHouse in Docker, including redelivery and queue outage cases, for each supported queue.
 - Language: `pnpm typecheck` runs strict TypeScript checks in every package, and a CI step fails when a `.js`, `.mjs`, `.cjs` or `.jsx` source file is tracked (REQ-TRACKER-2D61).
