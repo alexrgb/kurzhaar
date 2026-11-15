@@ -4,14 +4,16 @@
   "private": true,
   "license": "MIT",
   "description": "Light, cookieless browser tracker (TypeScript source, built with esbuild)",
+  "type": "module",
   "scripts": {
-    "build": "node build.mjs",
-    "typecheck": "tsc -p .",
-    "test": "node --test test/*.test.js"
+    "build": "node build.ts",
+    "typecheck": "tsc -p . && tsc -p tsconfig.node.json",
+    "test": "node --test test/*.test.ts"
   },
   "devDependencies": {
     "@kurzhaar/protocol": "workspace:*",
     "esbuild": "^0.25.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "@types/node": "^24.0.0"
   }
 }
