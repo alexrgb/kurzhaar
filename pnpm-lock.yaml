@@ -24,13 +24,23 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  packages/protocol: {}
+  packages/protocol:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   packages/tracker:
     devDependencies:
       '@kurzhaar/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12

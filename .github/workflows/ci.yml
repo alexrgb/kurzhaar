@@ -43,6 +43,14 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      - name: No JavaScript sources (REQ-TRACKER-2D61)
+        run: |
+          files=$(git ls-files '*.js' '*.mjs' '*.cjs' '*.jsx')
+          if [ -n "$files" ]; then
+            echo "JavaScript sources are not allowed, write TypeScript (ADR-03W7):"
+            echo "$files"
+            exit 1
+          fi
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm build
