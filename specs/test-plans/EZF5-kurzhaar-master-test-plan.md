@@ -20,6 +20,7 @@ links:
     - REQ-COLLECT-FRDS
     - REQ-COLLECT-4VTR
     - REQ-COLLECT-FWT0
+    - REQ-COLLECT-J4S5
     - REQ-METRICS-63R7
     - REQ-METRICS-9N0K
     - REQ-METRICS-FNX4
@@ -33,11 +34,13 @@ links:
     - REQ-PROTOCOL-SP2Z
     - REQ-PROTOCOL-6NJT
     - REQ-PROTOCOL-16FY
+    - REQ-PROTOCOL-GEE0
     - REQ-TRACKER-33M7
     - REQ-TRACKER-8PXD
     - REQ-TRACKER-3N0V
     - REQ-TRACKER-2QEW
     - REQ-TRACKER-50ST
+    - REQ-TRACKER-KE2V
     - RISK-3B2M
     - RISK-6DCB
     - RISK-88FF
@@ -71,12 +74,13 @@ links:
     - RISK-HZNX
     - RISK-D66S
     - RISK-K28G
+    - RISK-SQGK
 ---
 # TP-EZF5: Kurzhaar master test plan
 
 ## Scope
 
-In scope for the first documented version: the wire protocol, the tracker (including engagement, automatic events and Web Vitals), the collector (including device classes and campaign fields), visit metrics, API key authentication, privacy guarantees and metric consistency between the API and dashboard clusters. Not yet covered: the admin and dashboard user interfaces, the WebSocket service, the MCP server, mobile SDKs and export of events older than 30 days (see the technical debt entry). Plans for those areas are added when their requirements are written.
+In scope for the first documented version: the wire protocol, the tracker (including engagement, automatic events, Web Vitals, tags, tracker version and timezone offset), the collector (including device classes and campaign fields), visit metrics, API key authentication, privacy guarantees and metric consistency between the API and dashboard clusters. Not yet covered: the admin and dashboard user interfaces, the WebSocket service, the MCP server, mobile SDKs and export of events older than 30 days (see the technical debt entry). Plans for those areas are added when their requirements are written.
 
 ## Approach
 
