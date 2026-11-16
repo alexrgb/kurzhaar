@@ -2,7 +2,7 @@
 
 Light, privacy-first, self-hosted web and product analytics. MIT licensed.
 
-> Status: early. Architecture and requirements are documented (`specs/`, see `docs/README.md`); the code is a scaffold plus a prototype tracker and protocol decoders.
+> Status: early. Architecture and requirements are documented (`docs/`, see `docs/README.md`); the code is a scaffold plus a prototype tracker and protocol decoders.
 
 ## Layout
 
@@ -14,7 +14,7 @@ Light, privacy-first, self-hosted web and product analytics. MIT licensed.
 | `packages/` | `tracker` (browser tracker prototype), `protocol` (reference decoder) |
 | `sdks/` | React, Node, React Native, Flutter, iOS, Android (placeholders) |
 | `schema/`, `contracts/`, `deploy/` | ClickHouse schema, cross-language contracts, Docker (see [`deploy/README.md`](deploy/README.md) for the compose stack) |
-| `specs/`, `docs/` | oxispec nodes: ADRs, requirements, test plan, risks |
+| `docs/` | Documentation and the oxispec nodes: ADRs, requirements, test plan, risks |
 
 ## Develop
 

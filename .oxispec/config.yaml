@@ -16,6 +16,7 @@ modules:
 - mcp
 topology: single
 id_scheme: random
+docs_dir: docs
 trace:
   exclude: []
   languages:
