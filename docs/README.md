@@ -4,11 +4,11 @@ Project knowledge lives as linked nodes managed by [oxispec](https://github.com/
 
 | Where | What |
 |---|---|
-| `docs/specs/adr/` | Architecture decision records: why the architecture is what it is |
-| `docs/specs/requirements/<domain>/` | Requirements with scenarios (domains: protocol, collect, tracker, privacy, auth, metrics) |
-| `docs/specs/test-plans/` | Test plans and which requirements and risks they cover |
-| `docs/specs/risks/` | Risk register |
-| `docs/specs/debt/` | Known shortcuts and deferred decisions |
+| `docs/adr/` | Architecture decision records: why the architecture is what it is |
+| `docs/requirements/<domain>/` | Requirements with scenarios (domains: protocol, collect, tracker, privacy, auth, metrics) |
+| `docs/test-plans/` | Test plans and which requirements and risks they cover |
+| `docs/risks/` | Risk register |
+| `docs/debt/` | Known shortcuts and deferred decisions |
 
 Useful commands (run from the repository root):
 

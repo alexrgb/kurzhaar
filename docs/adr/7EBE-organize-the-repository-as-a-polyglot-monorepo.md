@@ -21,7 +21,7 @@ One repository, organized by artifact type:
 - `schema/`: ClickHouse migrations and metric templates.
 - `contracts/`: cross-language contracts (protocol vectors, generated OpenAPI, golden datasets).
 - `deploy/`: Docker, compose profiles and the reverse proxy.
-- `docs/`: all documentation. The oxispec nodes (ADRs, requirements, test plans, risks, debt) live in `docs/specs/`, set by `docs_dir` in `.oxispec/config.yaml`; generated references such as `docs/protocol.md` sit next to them. Node IDs do not change when the folder moves.
+- `docs/`: all documentation. The oxispec nodes (ADRs, requirements, test plans, risks, debt) live next to them in `docs/`, set by `docs_dir` in `.oxispec/config.yaml`; generated references such as `docs/protocol.md` sit next to them. Node IDs do not change when the folder moves.
 
 Tooling: pnpm and Turborepo for TypeScript, a Cargo workspace for Rust, a root `Package.swift` pointing to `sdks/ios` for Swift Package Manager. Services depend on crates but not on each other; apps depend on generated API clients, never on Rust code. Languages share only `contracts/`.
 
