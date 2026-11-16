@@ -1,7 +1,7 @@
 ---
 id: ADR-D3BB
 type: adr
-status: proposed
+status: accepted
 links:
   refines:
     - ADR-83V0

@@ -1,7 +1,7 @@
 ---
 id: ADR-1X7Z
 type: adr
-status: proposed
+status: accepted
 links:
   refines:
     - ADR-ZKD1

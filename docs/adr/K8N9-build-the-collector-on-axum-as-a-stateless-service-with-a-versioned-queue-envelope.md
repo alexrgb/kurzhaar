@@ -1,7 +1,7 @@
 ---
 id: ADR-K8N9
 type: adr
-status: proposed
+status: accepted
 links:
   refines:
     - ADR-4GM5
