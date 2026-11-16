@@ -62,6 +62,22 @@ pub struct Batch {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "tzOffset")]
     pub tz_offset: Option<i32>,
+    /// Device signals (revision 1.3, ADR-ZKD1): raw input for server-side detection, never stored.
+    #[serde(rename = "clientBrands", skip_serializing_if = "Vec::is_empty")]
+    pub client_brands: Vec<String>,
+    #[serde(rename = "clientMobile", skip_serializing_if = "Option::is_none")]
+    pub client_mobile: Option<u8>,
+    #[serde(rename = "clientPlatform", skip_serializing_if = "Option::is_none")]
+    pub client_platform: Option<String>,
+    #[serde(
+        rename = "clientPlatformVersion",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub client_platform_version: Option<String>,
+    #[serde(rename = "touchPoints", skip_serializing_if = "Option::is_none")]
+    pub touch_points: Option<u32>,
+    #[serde(rename = "coarsePointer", skip_serializing_if = "Option::is_none")]
+    pub coarse_pointer: Option<u8>,
     pub events: Vec<Event>,
 }
 
@@ -123,6 +139,14 @@ fn parse_line(line: &str) -> Vec<(String, String)> {
         .collect()
 }
 
+/// A list field: split on commas first, then unescape each item, so `%2C` stays inside an item.
+fn split_list(raw: &str) -> Vec<String> {
+    raw.split(',')
+        .filter(|t| !t.is_empty())
+        .map(unescape)
+        .collect()
+}
+
 fn num<T: std::str::FromStr>(v: &str) -> Result<T, DecodeError> {
     v.parse().map_err(|_| DecodeError::BadNumber(v.to_string()))
 }
@@ -165,14 +189,7 @@ pub fn decode(body: &str) -> Result<Batch, DecodeError> {
             title: text("t"),
             referrer: text("r"),
             props,
-            tags: find("g")
-                .map(|g| {
-                    g.split(',')
-                        .filter(|t| !t.is_empty())
-                        .map(unescape)
-                        .collect()
-                })
-                .unwrap_or_default(),
+            tags: find("g").map(split_list).unwrap_or_default(),
             engaged_ms: find("et").map(num::<u32>).transpose()?,
             scroll_pct: find("sc").map(num::<u8>).transpose()?,
             lcp: find("lcp").map(num::<u32>).transpose()?,
@@ -190,6 +207,12 @@ pub fn decode(body: &str) -> Result<Batch, DecodeError> {
         identity: get("i"),
         tracker_version: get("tv"),
         tz_offset: raw("tz").map(num::<i32>).transpose()?,
+        client_brands: raw("cb").map(split_list).unwrap_or_default(),
+        client_mobile: raw("cm").map(num::<u8>).transpose()?,
+        client_platform: get("cp"),
+        client_platform_version: get("cv"),
+        touch_points: raw("tp").map(num::<u32>).transpose()?,
+        coarse_pointer: raw("pc").map(num::<u8>).transpose()?,
         events,
     })
 }

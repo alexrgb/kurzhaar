@@ -30,6 +30,13 @@ export interface DecodedBatch {
   trackerVersion?: string;
   /** `tz`: visitor offset from UTC in minutes, negative west of UTC (revision 1.2). */
   tzOffset?: number;
+  /** Device signals (revision 1.3, ADR-ZKD1): raw input for server-side detection, never stored. */
+  clientBrands?: string[];
+  clientMobile?: number;
+  clientPlatform?: string;
+  clientPlatformVersion?: string;
+  touchPoints?: number;
+  coarsePointer?: number;
   events: DecodedEvent[];
 }
 
@@ -65,9 +72,9 @@ function parseLine(line: string): Record<string, string> {
 /** Unescaped value of a plain field. */
 const str = (o: Record<string, string>, k: string): string | undefined => (o[k] === undefined ? undefined : unesc(o[k]));
 
-/** `g` tags: split on commas first, then unescape each tag, so `%2C` stays inside a tag. */
-function tagsOf(o: Record<string, string>): string[] | undefined {
-  const raw = o.g;
+/** list fields (`g`, `cb`): split on commas first, then unescape each tag, so `%2C` stays inside a tag. */
+function listOf(o: Record<string, string>, k: string): string[] | undefined {
+  const raw = o[k];
   if (raw === undefined || raw === '') return undefined;
   const tags = raw.split(',').filter((t) => t !== '').map(unesc);
   return tags.length ? tags : undefined;
@@ -84,7 +91,7 @@ export function decode(body: string): DecodedBatch {
     const props: Record<string, string> = {};
     for (const k in o) if (k.startsWith('p.')) props[unesc(k.slice(2))] = unesc(o[k] as string);
     const e: DecodedEvent = { ts: t, type: Number(o.y || 0), name: str(o, 'n'), url: str(o, 'u'), title: str(o, 't'), referrer: str(o, 'r'), props };
-    const tags = tagsOf(o);
+    const tags = listOf(o, 'g');
     if (tags) e.tags = tags;
     for (const [field, key, whole] of EXTRA) {
       const n = optNum(o, field, whole);
@@ -97,5 +104,15 @@ export function decode(body: string): DecodedBatch {
   if (tv !== undefined) batch.trackerVersion = tv;
   const tz = optNum(h, 'tz', true);
   if (tz !== undefined) batch.tzOffset = tz;
+  const brands = listOf(h, 'cb');
+  if (brands) batch.clientBrands = brands;
+  const cp = str(h, 'cp');
+  if (cp !== undefined) batch.clientPlatform = cp;
+  const cv = str(h, 'cv');
+  if (cv !== undefined) batch.clientPlatformVersion = cv;
+  for (const [field, key] of [['cm', 'clientMobile'], ['tp', 'touchPoints'], ['pc', 'coarsePointer']] as const) {
+    const n = optNum(h, field, true);
+    if (n !== undefined) batch[key] = n;
+  }
   return batch;
 }

@@ -13,6 +13,12 @@ interface Decoded {
   identity?: string;
   trackerVersion?: string;
   tzOffset?: number;
+  clientBrands?: string[];
+  clientMobile?: number;
+  clientPlatform?: string;
+  clientPlatformVersion?: string;
+  touchPoints?: number;
+  coarsePointer?: number;
   events: { tags?: string[]; ts: number; type: number; name?: string; url?: string; title?: string; referrer?: string; props: Record<string, string>; engagedMs?: number; scrollPct?: number; lcp?: number; inp?: number; cls?: number; fcp?: number; ttfb?: number }[];
 }
 interface Vector {
@@ -26,7 +32,7 @@ const { vectors } = JSON.parse(readFileSync(new URL('../../../contracts/protocol
 };
 
 function encodeDecoded(d: Decoded): string {
-  const header: BatchHeader = { key: d.key, screen: d.screen, lang: d.lang, identity: d.identity, trackerVersion: d.trackerVersion, tzOffset: d.tzOffset };
+  const header: BatchHeader = { key: d.key, screen: d.screen, lang: d.lang, identity: d.identity, trackerVersion: d.trackerVersion, tzOffset: d.tzOffset, clientBrands: d.clientBrands, clientMobile: d.clientMobile, clientPlatform: d.clientPlatform, clientPlatformVersion: d.clientPlatformVersion, touchPoints: d.touchPoints, coarsePointer: d.coarsePointer };
   const events: WireEvent[] = d.events.map((e) => ({ ...e, type: e.type as EventType }));
   return encodeBatch(header, events);
 }
@@ -149,18 +155,18 @@ test('encoder writes only keys that the registry lists', () => {
     ts: 1, name: 'n', url: '/', title: 't', referrer: 'r', tags: ['a'], engagedMs: 1, scrollPct: 1, lcp: 1, inp: 1, cls: 0.1, fcp: 1, ttfb: 1, props: { a: 'b' },
   };
   const body = encodeBatch(
-    { key: 'k', screen: '1x1', lang: 'en', identity: 'i', trackerVersion: '1.0.0', tzOffset: -60 },
+    { key: 'k', screen: '1x1', lang: 'en', identity: 'i', trackerVersion: '1.0.0', tzOffset: -60, clientBrands: ['A/1'], clientMobile: 1, clientPlatform: 'p', clientPlatformVersion: '2', touchPoints: 5, coarsePointer: 0 },
     [full, { ...full, ts: 2, type: 1 as EventType }, { ...full, ts: 3, type: 3 as EventType }],
   );
   for (const line of body.split('\n')) for (const k of keysOf(line)) assert.ok(allowed(k), `key "${k}" is not in contracts/protocol/fields.json`);
 });
 
 test('the encoder can write every registered key', () => {
-  const header: Record<string, string> = { k: 'key', s: 'screen', l: 'lang', i: 'identity', tv: 'trackerVersion', tz: 'tzOffset' };
+  const header: Record<string, string> = { k: 'key', s: 'screen', l: 'lang', i: 'identity', tv: 'trackerVersion', tz: 'tzOffset', cb: 'clientBrands', cm: 'clientMobile', cp: 'clientPlatform', cv: 'clientPlatformVersion', tp: 'touchPoints', pc: 'coarsePointer' };
   for (const f of registry.fields.filter((x) => x.scope === 'header' && x.decoded)) {
     const opt = header[f.key];
     assert.ok(opt, `no encoder option for header key ${f.key}`);
-    assert.ok(encodeHeader({ [opt]: f.type === 'int' ? Number(f.example) : f.example } as BatchHeader).includes(`${f.key}::`), f.key);
+    assert.ok(encodeHeader({ [opt]: f.type === 'int' ? Number(f.example) : f.type === 'list' ? f.example.split(',') : f.example } as BatchHeader).includes(`${f.key}::`), f.key);
   }
   for (const f of registry.fields.filter((x) => x.scope === 'event' && x.decoded && !x.family && x.key !== 'ts')) {
     const type = (Array.isArray(f.types) ? f.types[0] : 0) as EventType;
@@ -189,4 +195,13 @@ test('header: tracker version and a negative timezone offset', () => {
   const d = decode(encodeBatch({ trackerVersion: '1.4.2', tzOffset: -300 }, [{ ts: 1 }]));
   assert.equal(d.trackerVersion, '1.4.2');
   assert.equal(d.tzOffset, -300);
+});
+
+// verifies: REQ-PROTOCOL-Y7G7 (device signals round-trip, a brand with a slash and a comma stays whole)
+test('header: device signals in registry order, brands with slash and comma round-trip', () => {
+  const h: BatchHeader = { key: 'k', clientBrands: ['Chromium/124', 'Not/A)Brand/99', 'a,b/1'], clientMobile: false, clientPlatform: 'Windows', clientPlatformVersion: '15', touchPoints: 0, coarsePointer: true };
+  assert.equal(encodeHeader(h), 'v::1|k::k|cb::Chromium/124,Not/A)Brand/99,a%2Cb/1|cm::0|cp::Windows|cv::15|tp::0|pc::1');
+  const d = decode(encodeBatch(h, [{ ts: 1 }]));
+  assert.deepEqual(d.clientBrands, ['Chromium/124', 'Not/A)Brand/99', 'a,b/1']);
+  assert.deepEqual([d.clientMobile, d.clientPlatform, d.clientPlatformVersion, d.touchPoints, d.coarsePointer], [0, 'Windows', '15', 0, 1]);
 });

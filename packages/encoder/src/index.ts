@@ -27,6 +27,13 @@ export interface BatchHeader {
   trackerVersion?: string;
   /** Offset from UTC in whole minutes, negative west of UTC (`tz`, revision 1.2). */
   tzOffset?: number;
+  /** Device signals (revision 1.3, ADR-ZKD1): `cb` entries written `Brand/major`, `cm`, `cp`, `cv` (major only), `tp`, `pc`. */
+  clientBrands?: readonly string[];
+  clientMobile?: number | boolean;
+  clientPlatform?: string;
+  clientPlatformVersion?: string;
+  touchPoints?: number;
+  coarsePointer?: number | boolean;
 }
 
 export interface WireEvent {
@@ -81,13 +88,14 @@ function join(fields: (string | undefined)[]): string {
 
 /** Encodes the header line. The version is always the first field. */
 export function encodeHeader(header: BatchHeader = {}): string {
-  return join(['v::1', field('k', header.key), field('s', header.screen), field('l', header.lang), field('i', header.identity), field('tv', header.trackerVersion), field('tz', header.tzOffset)]);
+  return join(['v::1', field('k', header.key), field('s', header.screen), field('l', header.lang), field('i', header.identity), field('tv', header.trackerVersion), field('tz', header.tzOffset),
+    listField('cb', header.clientBrands), field('cm', header.clientMobile), field('cp', header.clientPlatform), field('cv', header.clientPlatformVersion), field('tp', header.touchPoints), field('pc', header.coarsePointer)]);
 }
 
-/** `g::a,b`: every tag is escaped on its own, then the tags are joined, so the value is not escaped twice. */
-function tagsField(tags: readonly string[] | undefined): string | undefined {
-  const list = (tags ?? []).filter((t) => t !== '').map((t) => escapeValue(t).replace(/,/g, '%2C'));
-  return list.length ? 'g::' + list.join(',') : undefined;
+/** `g::a,b`: every item is escaped on its own, then the items are joined, so the value is not escaped twice. */
+function listField(key: string, items: readonly string[] | undefined): string | undefined {
+  const list = (items ?? []).filter((t) => t !== '').map((t) => escapeValue(t).replace(/,/g, '%2C'));
+  return list.length ? key + '::' + list.join(',') : undefined;
 }
 
 function checkTs(ts: number): void {
@@ -110,7 +118,7 @@ export function encodeEvents(events: readonly WireEvent[]): string[] {
       field('u', e.url),
       field('t', e.title),
       field('r', e.referrer),
-      tagsField(e.tags),
+      listField('g', e.tags),
       field('et', e.engagedMs),
       field('sc', e.scrollPct),
       field('lcp', e.lcp),

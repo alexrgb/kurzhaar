@@ -6,6 +6,13 @@
 type Props = Record<string, unknown>;
 // Tracker version, replaced by esbuild at build time from package.json (wire key `tv`).
 declare const __VERSION__: string;
+// User-Agent Client Hints (Chromium only); not in the DOM typings.
+interface Uad {
+  brands?: { brand: string; version: string }[];
+  mobile?: boolean;
+  platform?: string;
+  getHighEntropyValues?(hints: string[]): { then(ok: (v?: { platformVersion?: string }) => void, err: () => void): unknown };
+}
 interface Ev {
   y: number;
   ts: number;
@@ -37,7 +44,12 @@ interface Lt {
     timer: ReturnType<typeof setTimeout> | 0 = 0,
     ident: string | undefined,
     lastPath: string | null = null,
-    sent = 0;
+    sent = 0,
+    // Device signals for server-side detection (ADR-ZKD1). `cv` (platform major version) is async.
+    uad = (nav as Navigator & { userAgentData?: Uad }).userAgentData,
+    cv: string | undefined,
+    waiting = false,
+    hintTimer: ReturnType<typeof setTimeout> | 0 = 0;
 
   // Query params kept by default; everything else is stripped client-side (may contain tokens or emails).
   var KEEP = /^(utm_\w+|gclid|fbclid|msclkid|ttclid|twclid|li_fat_id|gad_source|dclid|wbraid|gbraid|mc_cid|igshid|ref)$/;
@@ -87,10 +99,10 @@ interface Lt {
     return v == null || v === '' ? '' : k + '::' + esc(val(v));
   }
 
-  // Each tag is escaped on its own and "," inside a tag becomes %2C; the joined value is not escaped again.
-  function tagsPair(g?: string[]): string {
+  // Each item is escaped on its own and "," inside an item becomes %2C; the joined value is not escaped again.
+  function listPair(k: string, g?: string[]): string {
     return g && g.length
-      ? 'g::' +
+      ? k + '::' +
           g
             .map(function (t) {
               return esc(t).replace(/,/g, '%2C');
@@ -110,12 +122,26 @@ interface Lt {
     return out.length ? out : undefined;
   }
 
+  // Brands, mobile flag, platform, platform major version, touch points and pointer type. Never a model or build number.
+  function signals(): string[] {
+    var coarse = w.matchMedia ? (w.matchMedia('(pointer:coarse)').matches ? 1 : 0) : undefined;
+    var f = [pair('tp', nav.maxTouchPoints), pair('pc', coarse)];
+    if (uad)
+      f.unshift(
+        listPair('cb', (uad.brands || []).map(function (b) { return b.brand + '/' + b.version; })),
+        pair('cm', uad.mobile ? 1 : 0),
+        pair('cp', uad.platform),
+        pair('cv', cv)
+      );
+    return f;
+  }
+
   function encode(events: Ev[]): string {
-    var head = ['v::1', pair('k', key), pair('s', d.documentElement.clientWidth + 'x' + d.documentElement.clientHeight), pair('l', nav.language), pair('i', ident), pair('tv', __VERSION__), pair('tz', 0 - new Date().getTimezoneOffset())];
+    var head = ['v::1', pair('k', key), pair('s', d.documentElement.clientWidth + 'x' + d.documentElement.clientHeight), pair('l', nav.language), pair('i', ident), pair('tv', __VERSION__), pair('tz', 0 - new Date().getTimezoneOffset())].concat(signals());
     var lines = [head.filter(Boolean).join('|')];
     var prev = 0;
     events.forEach(function (e, n) {
-      var f = [n ? pair('d', e.ts - prev) : pair('ts', e.ts), e.y ? pair('y', e.y) : '', pair('n', e.n), pair('u', e.u), pair('t', e.t), pair('r', e.r), tagsPair(e.g)];
+      var f = [n ? pair('d', e.ts - prev) : pair('ts', e.ts), e.y ? pair('y', e.y) : '', pair('n', e.n), pair('u', e.u), pair('t', e.t), pair('r', e.r), listPair('g', e.g)];
       prev = e.ts;
       for (var k in e.p) f.push(pair('p.' + esc(k).replace(/:/g, '%3A'), e.p[k]));
       lines.push(f.filter(Boolean).join('|'));
@@ -146,8 +172,34 @@ interface Lt {
     q.push(ev as Ev);
     // Leading edge: the first event of a page load is sent at once (it is the most valuable one),
     // later events wait up to `win` ms, or until 20 are queued, or the page is hidden.
-    if (!batch || !sent || q.length >= 20) flush();
-    else if (!timer) timer = setTimeout(flush, win);
+    if (!batch || !sent || q.length >= 20) {
+      // The first send of a page load waits up to 150 ms for the platform version (REQ-TRACKER-EZ0J).
+      if (waiting) hintTimer = hintTimer || setTimeout(release, 150);
+      else flush();
+    } else if (!timer) timer = setTimeout(flush, win);
+  }
+
+  function release(): void {
+    clearTimeout(hintTimer || undefined);
+    hintTimer = 0;
+    waiting = false;
+    flush();
+  }
+
+  if (uad && uad.getHighEntropyValues) {
+    waiting = true;
+    try {
+      uad.getHighEntropyValues(['platformVersion']).then(
+        function (v) {
+          var m = v && v.platformVersion ? parseInt(v.platformVersion, 10) : NaN;
+          if (m === m) cv = String(m);
+          release();
+        },
+        release
+      );
+    } catch (e) {
+      waiting = false;
+    }
   }
 
   function view(ref?: string): void {
