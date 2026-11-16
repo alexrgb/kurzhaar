@@ -152,6 +152,38 @@
       "error": "invalid number: 1.5"
     },
     {
+      "name": "device signals from a Chromium browser",
+      "body": "v::1|k::abc|cb::Chromium/124,Google Chrome/124|cm::0|cp::Windows|cv::15|tp::0|pc::0\nts::1000|u::/",
+      "expected": {
+        "key": "abc",
+        "clientBrands": ["Chromium/124", "Google Chrome/124"],
+        "clientMobile": 0,
+        "clientPlatform": "Windows",
+        "clientPlatformVersion": "15",
+        "touchPoints": 0,
+        "coarsePointer": 0,
+        "events": [
+          {"ts": 1000, "type": 0, "url": "/", "props": {}}
+        ]
+      }
+    },
+    {
+      "name": "brand with a slash keeps its major version after the last slash",
+      "body": "v::1|k::abc|cb::Not/A)Brand/99\nts::1000|u::/",
+      "expected": {
+        "key": "abc",
+        "clientBrands": ["Not/A)Brand/99"],
+        "events": [
+          {"ts": 1000, "type": 0, "url": "/", "props": {}}
+        ]
+      }
+    },
+    {
+      "name": "touch points must be a whole number",
+      "body": "v::1|k::abc|tp::1.5\nts::1000|u::/",
+      "error": "invalid number: 1.5"
+    },
+    {
       "name": "unsupported version",
       "body": "v::9|k::abc\nts::10|u::/",
       "error": "unsupported protocol version"

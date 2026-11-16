@@ -11,11 +11,11 @@ The system SHALL decode the header fields `cb` (client brands), `cm` (mobile fla
 
 #### Scenario: Chromium signals {#S1}
 - **WHEN** the header contains cb::Chromium/124,Google Chrome/124|cm::0|cp::Windows|cv::15|tp::0|pc::0
-- **THEN** the decoder returns two brands with their major versions, mobile false, platform Windows, platform version 15, no touch points and a fine pointer
+- **THEN** the decoder returns the brands Chromium/124 and Google Chrome/124, mobile 0, platform Windows, platform version 15, 0 touch points and pointer 0
 
 #### Scenario: Brand with a slash {#S2}
 - **WHEN** the header contains cb::Not/A)Brand/99
-- **THEN** the brand is Not/A)Brand and its major version is 99
+- **THEN** the decoder returns one brand entry Not/A)Brand/99, whose major version is what follows the last slash
 
 #### Scenario: Signals absent {#S3}
 - **WHEN** a batch contains none of these fields

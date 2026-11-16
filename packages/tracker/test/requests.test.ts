@@ -23,7 +23,7 @@ interface Controls {
 }
 type Scenario = (c: Controls) => void;
 
-function run(attrs: Record<string, string>, scenario: Scenario, opts: { href?: string; tzMinutesBehindUtc?: number } = {}) {
+function run(attrs: Record<string, string>, scenario: Scenario, opts: { href?: string; tzMinutesBehindUtc?: number; hints?: { delayMs: number; platformVersion?: string }; touch?: number; coarse?: boolean } = {}) {
   let clock = 1731150000000, timers: Timer[] = [], id = 0;
   const bodies: string[] = [];
   const wl: Record<string, Handler> = {}, dl: Record<string, Handler> = {};
@@ -32,7 +32,8 @@ function run(attrs: Record<string, string>, scenario: Scenario, opts: { href?: s
   const w: Record<string, any> = {
     history: { pushState() {}, replaceState() {} },
     location: loc,
-    navigator: { language: 'uk-UA', sendBeacon: (_u: string, b: string) => { bodies.push(b); return true; } },
+    navigator: { language: 'uk-UA', maxTouchPoints: opts.touch ?? 0, sendBeacon: (_u: string, b: string) => { bodies.push(b); return true; } },
+    matchMedia: (q: string) => ({ matches: q === '(pointer:coarse)' && !!opts.coarse }),
     localStorage: { getItem: () => null },
     addEventListener: (t: string, f: Handler) => (wl[t] = f),
   };
@@ -44,6 +45,16 @@ function run(attrs: Record<string, string>, scenario: Scenario, opts: { href?: s
   };
   w.window = w;
   const setTimeout_ = (f: Handler, ms: number) => { timers.push({ id: ++id, at: clock + ms, f }); return id; };
+  if (opts.hints) {
+    const hints = opts.hints;
+    // A synchronous stand-in for the promise, so the fake clock decides when the answer arrives.
+    w.navigator.userAgentData = {
+      brands: [{ brand: 'Chromium', version: '124' }, { brand: 'Not/A)Brand', version: '99' }],
+      mobile: false,
+      platform: 'Windows',
+      getHighEntropyValues: () => ({ then: (ok: (v: unknown) => void) => { setTimeout_(() => ok({ platformVersion: hints.platformVersion ?? '15.0.0' }), hints.delayMs); } }),
+    };
+  }
   const clearTimeout_ = (i: number) => { timers = timers.filter((t) => t.id !== i); };
   const advance = (ms: number) => {
     const end = clock + ms;
@@ -136,7 +147,7 @@ test('tags are sent on the event', () => {
 // verifies: REQ-TRACKER-KE2V#S2 (the header carries tv and tz, no zone name)
 test('the header carries the tracker version and the offset in minutes east of UTC', () => {
   const r = run({ 'data-key': 'k' }, ({ advance, hide }) => { advance(10); hide(); }, { tzMinutesBehindUtc: 300 });
-  assert.ok(r.bodies[0]!.split('\n')[0]!.endsWith('|tv::1.4.2|tz::-300'));
+  assert.ok(r.bodies[0]!.split('\n')[0]!.includes('|tv::1.4.2|tz::-300'));
   const east = run({ 'data-key': 'k' }, ({ hide }) => hide(), { tzMinutesBehindUtc: -120 });
   assert.equal(decode(east.bodies[0]!).tzOffset, 120);
   const utc = run({ 'data-key': 'k' }, ({ hide }) => hide());
@@ -165,4 +176,47 @@ test('click identifiers are kept in the URL and other parameters are stripped', 
   const url = decode(r.bodies[0]!).events[0]?.url ?? '';
   for (const k of ['gclid', 'gad_source', 'dclid', 'wbraid', 'gbraid', 'mc_cid', 'igshid']) assert.ok(url.includes(k + '='), k);
   assert.ok(!url.includes('token'));
+});
+
+// verifies: REQ-COLLECT-BCES#S2 (no client hints: only touch points and pointer type)
+test('without client hints the header carries only touch points and pointer type', () => {
+  const r = run({ 'data-key': 'k' }, ({ hide }) => hide(), { touch: 5, coarse: true });
+  const head = r.bodies[0]!.split('\n')[0]!;
+  assert.ok(head.endsWith('|tp::5|pc::1'), head);
+  assert.ok(!/\|(cb|cm|cp|cv)::/.test(head));
+});
+
+// verifies: REQ-COLLECT-BCES#S1, REQ-COLLECT-BCES#S3 (Chromium signals, platform major version only, no model or build)
+test('with client hints the header carries brands, mobile flag, platform and the platform major version', () => {
+  const r = run({ 'data-key': 'k' }, ({ advance, hide }) => { advance(50); hide(); }, { hints: { delayMs: 20, platformVersion: '15.0.0' } });
+  const h = decode(r.bodies[0]!);
+  assert.deepEqual(h.clientBrands, ['Chromium/124', 'Not/A)Brand/99']);
+  assert.deepEqual([h.clientMobile, h.clientPlatform, h.clientPlatformVersion, h.touchPoints, h.coarsePointer], [0, 'Windows', '15', 0, 0]);
+  assert.ok(!r.bodies[0]!.includes('15.0.0'));
+});
+
+// verifies: REQ-TRACKER-EZ0J#S1 (hints arrive in time: the first batch waits for them)
+test('the first batch waits for a fast platform version', () => {
+  const r = run({ 'data-key': 'k' }, ({ advance }) => { advance(10); }, { hints: { delayMs: 20 } });
+  assert.equal(r.requests, 0);
+  const done = run({ 'data-key': 'k' }, ({ advance }) => { advance(30); }, { hints: { delayMs: 20 } });
+  assert.equal(done.requests, 1);
+  assert.equal(decode(done.bodies[0]!).clientPlatformVersion, '15');
+});
+
+// verifies: REQ-TRACKER-EZ0J#S2 (slow hints: sent after 150 ms without cv, later batches carry it)
+test('a slow platform version does not hold the first batch longer than 150 ms', () => {
+  const slow = { hints: { delayMs: 200 } };
+  assert.equal(run({ 'data-key': 'k' }, ({ advance }) => advance(149), slow).requests, 0);
+  const sent = run({ 'data-key': 'k' }, ({ advance }) => advance(151), slow);
+  assert.equal(sent.requests, 1);
+  assert.ok(!/\|cv::/.test(sent.bodies[0]!.split('\n')[0]!), 'first batch has no cv');
+  const later = run({ 'data-key': 'k' }, ({ advance, lt, hide }) => { advance(300); lt.track('late'); advance(10); hide(); }, slow);
+  assert.equal(decode(later.bodies[later.bodies.length - 1]!).clientPlatformVersion, '15');
+});
+
+// verifies: REQ-TRACKER-EZ0J#S3 (no client hints in the browser: the first event goes at once)
+test('without client hints the first event is sent at once', () => {
+  const r = run({ 'data-key': 'k' }, () => {});
+  assert.equal(r.requests, 1);
 });

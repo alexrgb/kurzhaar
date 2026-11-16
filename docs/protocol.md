@@ -2,7 +2,7 @@
 
 <!-- Generated from contracts/protocol/fields.json by packages/protocol/scripts/reference.ts. Do not edit. -->
 
-Wire format version 1, revision 1.2. Revisions inside a version only add optional fields; decoders ignore keys they do not know. The decisions behind the format are in ADR-T7N1 and ADR-VJGJ.
+Wire format version 1, revision 1.3. Revisions inside a version only add optional fields; decoders ignore keys they do not know. The decisions behind the format are in ADR-T7N1 and ADR-VJGJ.
 
 A batch is plain text. Line 1 is the header, every following line is one event. A line is a list of `key::value` fields joined by `|`. In values, `%`, `|`, CR and LF are escaped as `%XX`.
 
@@ -28,6 +28,12 @@ A batch is plain text. Line 1 is the header, every following line is one event. 
 | `i` | identity | `identity` | string | - | no | - | 1.0 | Identify id supplied by the site; the collector stores only a keyed hash of it. |
 | `tv` | tracker version | `trackerVersion` | string | - | no | - | 1.2 | Version of the tracker script that built the batch. Not the protocol version `v`. Stored per event for diagnosis. |
 | `tz` | timezone offset | `tzOffset` | int | min | no | - | 1.2 | Visitor offset from UTC in minutes at the time of the batch, negative west of UTC (120 for Kyiv in summer, -300 for New York in winter). The zone name is not collected. Used for local-time reports, not for geography. |
+| `cb` | client brands | `clientBrands` | list | - | no | - | 1.3 | Client-hint brands, each written `Brand/major`; the major version follows the last slash. Raw signal for server-side device detection (ADR-ZKD1); the collector discards it after detection. |
+| `cm` | client mobile flag | `clientMobile` | int | - | no | - | 1.3 | Client-hint mobile flag, 1 or 0. Raw signal, discarded after detection. |
+| `cp` | client platform | `clientPlatform` | string | - | no | - | 1.3 | Client-hint platform name. Raw signal, discarded after detection. |
+| `cv` | client platform major version | `clientPlatformVersion` | string | - | no | - | 1.3 | Major version of the client-hint platform version only. Tells Windows 11 (13 and above) from Windows 10. Raw signal, discarded after detection. |
+| `tp` | maximum touch points | `touchPoints` | int | - | no | - | 1.3 | `navigator.maxTouchPoints`. Raw signal, discarded after detection. |
+| `pc` | coarse primary pointer | `coarsePointer` | int | - | no | - | 1.3 | 1 when the primary pointer is coarse (finger), else 0. Raw signal, discarded after detection. |
 
 ## Event fields
 

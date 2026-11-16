@@ -1,7 +1,7 @@
 {
-  "_comment": "Registry of wire format v1 keys (ADR-VJGJ). Every implementation is tested against it; docs/protocol.md is generated from it. Revisions inside v1 only add optional fields (1.1 = ADR-B0B4, 1.2 = ADR-6RMH).",
+  "_comment": "Registry of wire format v1 keys (ADR-VJGJ). Every implementation is tested against it; docs/protocol.md is generated from it. Revisions inside v1 only add optional fields (1.1 = ADR-B0B4, 1.2 = ADR-6RMH, 1.3 = ADR-ZKD1).",
   "protocol": 1,
-  "revision": "1.2",
+  "revision": "1.3",
   "eventTypes": [
     {
       "y": 0,
@@ -137,6 +137,84 @@
       "since": "1.2",
       "example": "-300",
       "description": "Visitor offset from UTC in minutes at the time of the batch, negative west of UTC (120 for Kyiv in summer, -300 for New York in winter). The zone name is not collected. Used for local-time reports, not for geography."
+    },
+    {
+      "key": "cb",
+      "name": "client brands",
+      "decoded": "clientBrands",
+      "scope": "header",
+      "types": null,
+      "type": "list",
+      "unit": null,
+      "required": false,
+      "since": "1.3",
+      "example": "Chromium/124,Google Chrome/124",
+      "description": "Client-hint brands, each written `Brand/major`; the major version follows the last slash. Raw signal for server-side device detection (ADR-ZKD1); the collector discards it after detection."
+    },
+    {
+      "key": "cm",
+      "name": "client mobile flag",
+      "decoded": "clientMobile",
+      "scope": "header",
+      "types": null,
+      "type": "int",
+      "unit": null,
+      "required": false,
+      "since": "1.3",
+      "example": "0",
+      "description": "Client-hint mobile flag, 1 or 0. Raw signal, discarded after detection."
+    },
+    {
+      "key": "cp",
+      "name": "client platform",
+      "decoded": "clientPlatform",
+      "scope": "header",
+      "types": null,
+      "type": "string",
+      "unit": null,
+      "required": false,
+      "since": "1.3",
+      "example": "Windows",
+      "description": "Client-hint platform name. Raw signal, discarded after detection."
+    },
+    {
+      "key": "cv",
+      "name": "client platform major version",
+      "decoded": "clientPlatformVersion",
+      "scope": "header",
+      "types": null,
+      "type": "string",
+      "unit": null,
+      "required": false,
+      "since": "1.3",
+      "example": "15",
+      "description": "Major version of the client-hint platform version only. Tells Windows 11 (13 and above) from Windows 10. Raw signal, discarded after detection."
+    },
+    {
+      "key": "tp",
+      "name": "maximum touch points",
+      "decoded": "touchPoints",
+      "scope": "header",
+      "types": null,
+      "type": "int",
+      "unit": null,
+      "required": false,
+      "since": "1.3",
+      "example": "0",
+      "description": "`navigator.maxTouchPoints`. Raw signal, discarded after detection."
+    },
+    {
+      "key": "pc",
+      "name": "coarse primary pointer",
+      "decoded": "coarsePointer",
+      "scope": "header",
+      "types": null,
+      "type": "int",
+      "unit": null,
+      "required": false,
+      "since": "1.3",
+      "example": "0",
+      "description": "1 when the primary pointer is coarse (finger), else 0. Raw signal, discarded after detection."
     },
     {
       "key": "ts",
