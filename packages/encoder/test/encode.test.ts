@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { decode } from '@kurzhaar/protocol';
+import { loadRegistry } from '@kurzhaar/protocol/registry';
 import { encodeBatch, encodeEvents, encodeHeader, escapePropName, escapeValue } from '../src/index.ts';
 import type { BatchHeader, EventType, WireEvent } from '../src/index.ts';
 
@@ -132,4 +133,37 @@ test('values with pipe, newline, CR, percent and escape lookalikes round-trip wi
 test('property names containing ":" and "::" round-trip', () => {
   const body = encodeBatch({}, [{ ts: 1, props: { 'a:b': '1', 'c::d': '2', ':': '3' } }]);
   assert.deepEqual(decode(body).events[0]?.props, { 'a:b': '1', 'c::d': '2', ':': '3' });
+});
+
+// verifies: REQ-PROTOCOL-J5CJ (the encoder writes only registered keys and can write every registered key)
+
+const registry = loadRegistry();
+const registered = new Set(registry.fields.map((f) => f.key));
+const allowed = (key: string) => registered.has(key) || (key.startsWith('p.') && registered.has('p.<name>'));
+const keysOf = (line: string) => line.split('|').map((p) => p.slice(0, p.indexOf('::')));
+
+test('encoder writes only keys that the registry lists', () => {
+  const full = {
+    ts: 1, name: 'n', url: '/', title: 't', referrer: 'r', engagedMs: 1, scrollPct: 1, lcp: 1, inp: 1, cls: 0.1, fcp: 1, ttfb: 1, props: { a: 'b' },
+  };
+  const body = encodeBatch(
+    { key: 'k', screen: '1x1', lang: 'en', identity: 'i' },
+    [full, { ...full, ts: 2, type: 1 as EventType }, { ...full, ts: 3, type: 3 as EventType }],
+  );
+  for (const line of body.split('\n')) for (const k of keysOf(line)) assert.ok(allowed(k), `key "${k}" is not in contracts/protocol/fields.json`);
+});
+
+test('the encoder can write every registered key', () => {
+  const header: Record<string, string> = { k: 'key', s: 'screen', l: 'lang', i: 'identity' };
+  for (const f of registry.fields.filter((x) => x.scope === 'header' && x.decoded)) {
+    const opt = header[f.key];
+    assert.ok(opt, `no encoder option for header key ${f.key}`);
+    assert.ok(encodeHeader({ [opt]: f.example } as BatchHeader).includes(`${f.key}::`), f.key);
+  }
+  for (const f of registry.fields.filter((x) => x.scope === 'event' && x.decoded && !x.family && x.key !== 'ts')) {
+    const type = (Array.isArray(f.types) ? f.types[0] : 0) as EventType;
+    const value = f.type === 'string' ? f.example : Number(f.example);
+    const line = encodeEvents([{ ts: 1 }, { ts: 2, type, [f.decoded!]: value } as WireEvent])[1]!;
+    assert.ok(line.includes(`${f.key}::`), `${f.key} is not written for ${f.decoded}`);
+  }
 });

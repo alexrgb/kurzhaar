@@ -8,11 +8,14 @@
   "main": "src/decode.ts",
   "types": "src/decode.ts",
   "exports": {
-    ".": "./src/decode.ts"
+    ".": "./src/decode.ts",
+    "./registry": "./src/registry.ts"
   },
   "scripts": {
     "typecheck": "tsc -p .",
-    "test": "node --test test/*.test.ts"
+    "test": "node --test test/*.test.ts",
+    "docs": "node scripts/reference.ts",
+    "docs:check": "node scripts/reference.ts --check"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
