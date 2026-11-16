@@ -16,7 +16,7 @@ test('every entry is complete and keys are unique', () => {
     seen.add(f.key);
     assert.match(f.since, /^\d+\.\d+$/, f.key);
     assert.ok(['header', 'event'].includes(f.scope), f.key);
-    assert.ok(['string', 'int', 'decimal'].includes(f.type), f.key);
+    assert.ok(['string', 'int', 'decimal', 'list'].includes(f.type), f.key);
     assert.ok(f.description.length > 0 && f.example.length > 0, f.key);
     assert.equal(f.scope === 'header', f.types === null, `${f.key}: types is set exactly for event fields`);
   }
@@ -51,6 +51,7 @@ for (const f of reg.fields) {
     const got = where[f.decoded];
     if (f.family) assert.equal((got as Record<string, string>)[f.exampleName!], f.example);
     else if (f.type === 'string') assert.equal(got, f.example);
+    else if (f.type === 'list') assert.deepEqual(got, f.example.split(','));
     else assert.equal(got, Number(f.example));
   });
 }

@@ -1,4 +1,4 @@
-//! Decoder for the Kurzhaar wire format v1.
+//! Decoder for the Kurzhaar wire format v1 (revision 1.2).
 //!
 //! One event per line, fields as `key::value` joined by `|`. The first line is the batch
 //! header. See `contracts/protocol/vectors.json` for the conformance vectors.
@@ -20,6 +20,9 @@ pub struct Event {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub referrer: Option<String>,
     pub props: BTreeMap<String, String>,
+    /// `g` tags (revision 1.2).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     /// `y::3` engagement: engaged time in ms (`et`).
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "engagedMs")]
@@ -51,6 +54,14 @@ pub struct Batch {
     pub lang: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identity: Option<String>,
+    /// `tv`: version of the tracker script (revision 1.2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "trackerVersion")]
+    pub tracker_version: Option<String>,
+    /// `tz`: visitor offset from UTC in minutes, negative west of UTC (revision 1.2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "tzOffset")]
+    pub tz_offset: Option<i32>,
     pub events: Vec<Event>,
 }
 
@@ -100,12 +111,14 @@ fn hex(c: u8) -> Option<u8> {
     }
 }
 
+/// Splits a line into fields. Values stay escaped, so a list field can be split before it is
+/// unescaped.
 fn parse_line(line: &str) -> Vec<(String, String)> {
     line.split('|')
         .filter_map(|part| {
             part.find("::")
                 .filter(|&i| i > 0)
-                .map(|i| (part[..i].to_string(), unescape(&part[i + 2..])))
+                .map(|i| (part[..i].to_string(), part[i + 2..].to_string()))
         })
         .collect()
 }
@@ -117,7 +130,8 @@ fn num<T: std::str::FromStr>(v: &str) -> Result<T, DecodeError> {
 pub fn decode(body: &str) -> Result<Batch, DecodeError> {
     let mut lines = body.split('\n');
     let head = parse_line(lines.next().ok_or(DecodeError::Empty)?);
-    let get = |k: &str| head.iter().find(|(n, _)| n == k).map(|(_, v)| v.clone());
+    let raw = |k: &str| head.iter().find(|(n, _)| n == k).map(|(_, v)| v.as_str());
+    let get = |k: &str| raw(k).map(unescape);
     match get("v").as_deref() {
         Some("1") => {}
         other => {
@@ -132,6 +146,7 @@ pub fn decode(body: &str) -> Result<Batch, DecodeError> {
     for line in lines {
         let fields = parse_line(line);
         let find = |k: &str| fields.iter().find(|(n, _)| n == k).map(|(_, v)| v.as_str());
+        let text = |k: &str| find(k).map(unescape);
         t = match find("ts") {
             Some(ts) => num(ts)?,
             None => t + find("d").map(num::<u64>).transpose()?.unwrap_or(0),
@@ -139,17 +154,25 @@ pub fn decode(body: &str) -> Result<Batch, DecodeError> {
         let mut props = BTreeMap::new();
         for (k, v) in &fields {
             if let Some(name) = k.strip_prefix("p.") {
-                props.insert(unescape(name), v.clone());
+                props.insert(unescape(name), unescape(v));
             }
         }
         events.push(Event {
             ts: t,
             kind: find("y").map(num::<u8>).transpose()?.unwrap_or(0),
-            name: find("n").map(String::from),
-            url: find("u").map(String::from),
-            title: find("t").map(String::from),
-            referrer: find("r").map(String::from),
+            name: text("n"),
+            url: text("u"),
+            title: text("t"),
+            referrer: text("r"),
             props,
+            tags: find("g")
+                .map(|g| {
+                    g.split(',')
+                        .filter(|t| !t.is_empty())
+                        .map(unescape)
+                        .collect()
+                })
+                .unwrap_or_default(),
             engaged_ms: find("et").map(num::<u32>).transpose()?,
             scroll_pct: find("sc").map(num::<u8>).transpose()?,
             lcp: find("lcp").map(num::<u32>).transpose()?,
@@ -165,6 +188,8 @@ pub fn decode(body: &str) -> Result<Batch, DecodeError> {
         screen: get("s"),
         lang: get("l"),
         identity: get("i"),
+        tracker_version: get("tv"),
+        tz_offset: raw("tz").map(num::<i32>).transpose()?,
         events,
     })
 }

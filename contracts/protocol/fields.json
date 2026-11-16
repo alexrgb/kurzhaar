@@ -1,7 +1,7 @@
 {
-  "_comment": "Registry of wire format v1 keys (ADR-VJGJ). Every implementation is tested against it; docs/protocol.md is generated from it. Revisions inside v1 only add optional fields (1.1 = ADR-B0B4).",
+  "_comment": "Registry of wire format v1 keys (ADR-VJGJ). Every implementation is tested against it; docs/protocol.md is generated from it. Revisions inside v1 only add optional fields (1.1 = ADR-B0B4, 1.2 = ADR-6RMH).",
   "protocol": 1,
-  "revision": "1.1",
+  "revision": "1.2",
   "eventTypes": [
     {
       "y": 0,
@@ -113,6 +113,32 @@
       "description": "Identify id supplied by the site; the collector stores only a keyed hash of it."
     },
     {
+      "key": "tv",
+      "name": "tracker version",
+      "decoded": "trackerVersion",
+      "scope": "header",
+      "types": null,
+      "type": "string",
+      "unit": null,
+      "required": false,
+      "since": "1.2",
+      "example": "1.4.2",
+      "description": "Version of the tracker script that built the batch. Not the protocol version `v`. Stored per event for diagnosis."
+    },
+    {
+      "key": "tz",
+      "name": "timezone offset",
+      "decoded": "tzOffset",
+      "scope": "header",
+      "types": null,
+      "type": "int",
+      "unit": "min",
+      "required": false,
+      "since": "1.2",
+      "example": "-300",
+      "description": "Visitor offset from UTC in minutes at the time of the batch, negative west of UTC (120 for Kyiv in summer, -300 for New York in winter). The zone name is not collected. Used for local-time reports, not for geography."
+    },
+    {
       "key": "ts",
       "name": "timestamp",
       "decoded": "ts",
@@ -208,6 +234,19 @@
       "since": "1.0",
       "example": "google.com/",
       "description": "External referrer as host and path, or an internal path."
+    },
+    {
+      "key": "g",
+      "name": "tags",
+      "decoded": "tags",
+      "scope": "event",
+      "types": "all",
+      "type": "list",
+      "unit": null,
+      "required": false,
+      "since": "1.2",
+      "example": "signup,paid",
+      "description": "Short labels on an event, separated by commas. A comma inside a tag is written `%2C`. At most 10 tags of 32 characters; the tracker enforces it and the collector drops the excess."
     },
     {
       "key": "p.<name>",

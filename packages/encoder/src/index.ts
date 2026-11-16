@@ -1,8 +1,8 @@
 // Encoder for wire format v1 (ADR-T7N1). Pure functions, no I/O, no dependencies.
 //
-//   v::1|k::<key>|s::<WxH>|l::<lang>|i::<id>      line 1: batch header
+//   v::1|k::<key>|s::<WxH>|l::<lang>|i::<id>|tv::<version>|tz::<minutes>   line 1: batch header
 //   ts::<epoch ms>|u::/|t::Title|r::ref            first event: full timestamp
-//   d::4000|y::1|n::signup|p.plan::pro             later events: delta ms from the previous event
+//   d::4000|y::1|n::signup|g::paid,trial|p.plan::pro   later events: delta ms from the previous event
 //   d::8000|y::3|u::/|et::7500|sc::80              engagement; y::4 carries lcp/inp/cls/fcp/ttfb (ADR-B0B4)
 //
 // The decoder reference lives in @kurzhaar/protocol; the browser tracker keeps its own
@@ -23,6 +23,10 @@ export interface BatchHeader {
   lang?: string;
   /** Identified user id (`i`). */
   identity?: string;
+  /** Version of the tracker script (`tv`, revision 1.2). */
+  trackerVersion?: string;
+  /** Offset from UTC in whole minutes, negative west of UTC (`tz`, revision 1.2). */
+  tzOffset?: number;
 }
 
 export interface WireEvent {
@@ -34,6 +38,8 @@ export interface WireEvent {
   url?: string;
   title?: string;
   referrer?: string;
+  /** Tags (`g`, revision 1.2). Empty tags are dropped; a comma inside a tag is escaped. */
+  tags?: readonly string[];
   /** Type 3: engaged time in ms (`et`) and maximum scroll percent 0-100 (`sc`). */
   engagedMs?: number;
   scrollPct?: number;
@@ -75,7 +81,13 @@ function join(fields: (string | undefined)[]): string {
 
 /** Encodes the header line. The version is always the first field. */
 export function encodeHeader(header: BatchHeader = {}): string {
-  return join(['v::1', field('k', header.key), field('s', header.screen), field('l', header.lang), field('i', header.identity)]);
+  return join(['v::1', field('k', header.key), field('s', header.screen), field('l', header.lang), field('i', header.identity), field('tv', header.trackerVersion), field('tz', header.tzOffset)]);
+}
+
+/** `g::a,b`: every tag is escaped on its own, then the tags are joined, so the value is not escaped twice. */
+function tagsField(tags: readonly string[] | undefined): string | undefined {
+  const list = (tags ?? []).filter((t) => t !== '').map((t) => escapeValue(t).replace(/,/g, '%2C'));
+  return list.length ? 'g::' + list.join(',') : undefined;
 }
 
 function checkTs(ts: number): void {
@@ -98,6 +110,7 @@ export function encodeEvents(events: readonly WireEvent[]): string[] {
       field('u', e.url),
       field('t', e.title),
       field('r', e.referrer),
+      tagsField(e.tags),
       field('et', e.engagedMs),
       field('sc', e.scrollPct),
       field('lcp', e.lcp),

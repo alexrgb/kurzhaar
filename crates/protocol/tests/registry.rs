@@ -64,6 +64,9 @@ fn decodes_every_registered_key() {
                 Value::from(example),
                 "{key}"
             );
+        } else if f["type"] == "list" {
+            let want: Vec<Value> = example.split(',').map(Value::from).collect();
+            assert_eq!(got.as_array(), Some(&want), "{key}");
         } else if f["type"] == "string" {
             assert_eq!(got.as_str(), Some(example), "{key}");
         } else {
