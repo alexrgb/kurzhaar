@@ -9,11 +9,11 @@ import { loadRegistry } from '@kurzhaar/protocol/registry';
 import { transformSync } from 'esbuild';
 
 // The tracker is TypeScript; strip the types and run the result unminified.
-const code = transformSync(readFileSync(new URL('../src/tracker.ts', import.meta.url), 'utf8'), { loader: 'ts' }).code;
+const code = transformSync(readFileSync(new URL('../src/tracker.ts', import.meta.url), 'utf8'), { loader: 'ts', define: { __VERSION__: '"1.4.2"' } }).code;
 
 type Handler = () => void;
 interface Timer { id: number; at: number; f: Handler }
-interface Lt { track(name: string, props?: Record<string, string>): void; identify(id: string): void; flush(): void }
+interface Lt { track(name: string, props?: Record<string, string>, tags?: string[]): void; identify(id: string): void; flush(): void }
 interface Controls {
   advance(ms: number): void;
   go(path: string, title: string): void;
@@ -23,11 +23,12 @@ interface Controls {
 }
 type Scenario = (c: Controls) => void;
 
-function run(attrs: Record<string, string>, scenario: Scenario) {
+function run(attrs: Record<string, string>, scenario: Scenario, opts: { href?: string; tzMinutesBehindUtc?: number } = {}) {
   let clock = 1731150000000, timers: Timer[] = [], id = 0;
   const bodies: string[] = [];
   const wl: Record<string, Handler> = {}, dl: Record<string, Handler> = {};
-  const loc = { href: 'https://acme.com/', pathname: '/', origin: 'https://acme.com' };
+  const start = new URL(opts.href ?? 'https://acme.com/');
+  const loc = { href: start.href, pathname: start.pathname, origin: start.origin };
   const w: Record<string, any> = {
     history: { pushState() {}, replaceState() {} },
     location: loc,
@@ -54,7 +55,7 @@ function run(attrs: Record<string, string>, scenario: Scenario) {
     }
     clock = end;
   };
-  vm.runInNewContext(code, { window: w, document: d, URL, URLSearchParams, setTimeout: setTimeout_, clearTimeout: clearTimeout_, Date: { now: () => clock }, JSON, fetch() {} });
+  vm.runInNewContext(code, { window: w, document: d, URL, URLSearchParams, setTimeout: setTimeout_, clearTimeout: clearTimeout_, Date: Object.assign(function () { return { getTimezoneOffset: () => opts.tzMinutesBehindUtc ?? 0 }; }, { now: () => clock }), JSON, fetch() {} });
   const go = (p: string, title: string) => { loc.pathname = p; loc.href = 'https://acme.com' + p; d.title = title; w.history.pushState({}, '', p); advance(1); };
   const hide = () => { d.visibilityState = 'hidden'; dl.visibilitychange && dl.visibilitychange(); w.lt.flush(); };
   const query = (q: string) => { loc.href = 'https://acme.com' + loc.pathname + q; w.history.replaceState({}, '', loc.href); advance(1); };
@@ -111,7 +112,7 @@ test('query-only changes do not create a pageview', () => {
 test('the tracker writes only keys that the registry lists', () => {
   const registered = new Set(loadRegistry().fields.map((f) => f.key));
   const r = run({ 'data-key': 'k' }, ({ advance, go, lt, hide }) => {
-    advance(10); lt.track('cta', { plan: 'pro' }); go('/pricing', 'P'); lt.identify('u1'); advance(4000); hide();
+    advance(10); lt.track('cta', { plan: 'pro' }, ['a', 'b']); go('/pricing', 'P'); lt.identify('u1'); advance(4000); hide();
   });
   assert.ok(r.bodies.length > 0);
   for (const body of r.bodies)
@@ -120,4 +121,48 @@ test('the tracker writes only keys that the registry lists', () => {
         const key = part.slice(0, part.indexOf('::'));
         assert.ok(registered.has(key) || (key.startsWith('p.') && registered.has('p.<name>')), `key "${key}" is not in contracts/protocol/fields.json`);
       }
+});
+
+// verifies: REQ-TRACKER-KE2V#S1 (a tagged event carries g)
+test('tags are sent on the event', () => {
+  const r = run({ 'data-key': 'k' }, ({ advance, lt, hide }) => {
+    advance(10); lt.track('signup', { plan: 'pro' }, ['paid', 'trial']); hide();
+  });
+  const events = r.bodies.flatMap((b) => decode(b).events);
+  assert.deepEqual(events.find((e) => e.name === 'signup')?.tags, ['paid', 'trial']);
+  assert.equal(events.find((e) => e.type === 0)?.tags, undefined);
+});
+
+// verifies: REQ-TRACKER-KE2V#S2 (the header carries tv and tz, no zone name)
+test('the header carries the tracker version and the offset in minutes east of UTC', () => {
+  const r = run({ 'data-key': 'k' }, ({ advance, hide }) => { advance(10); hide(); }, { tzMinutesBehindUtc: 300 });
+  assert.ok(r.bodies[0]!.split('\n')[0]!.endsWith('|tv::1.4.2|tz::-300'));
+  const east = run({ 'data-key': 'k' }, ({ hide }) => hide(), { tzMinutesBehindUtc: -120 });
+  assert.equal(decode(east.bodies[0]!).tzOffset, 120);
+  const utc = run({ 'data-key': 'k' }, ({ hide }) => hide());
+  assert.equal(decode(utc.bodies[0]!).tzOffset, 0);
+  assert.equal(decode(utc.bodies[0]!).trackerVersion, '1.4.2');
+});
+
+// verifies: REQ-TRACKER-KE2V#S3 (at most 10 tags of 32 characters)
+test('too many or too long tags are cut, empty tags and commas are handled', () => {
+  const many = Array.from({ length: 12 }, (_, i) => 'tag' + i);
+  const r = run({ 'data-key': 'k' }, ({ advance, lt, hide }) => {
+    advance(10);
+    lt.track('a', {}, many);
+    lt.track('b', {}, ['x'.repeat(40), '', 'p,q']);
+    hide();
+  });
+  const events = r.bodies.flatMap((b) => decode(b).events);
+  assert.deepEqual(events.find((e) => e.name === 'a')?.tags, many.slice(0, 10));
+  assert.deepEqual(events.find((e) => e.name === 'b')?.tags, ['x'.repeat(32), 'p,q']);
+});
+
+// verifies: REQ-TRACKER-50ST (the added click identifiers survive query stripping, other parameters do not)
+test('click identifiers are kept in the URL and other parameters are stripped', () => {
+  const href = 'https://acme.com/p?gclid=1&gad_source=2&dclid=3&wbraid=4&gbraid=5&mc_cid=6&igshid=7&token=secret';
+  const r = run({ 'data-key': 'k' }, ({ hide }) => hide(), { href });
+  const url = decode(r.bodies[0]!).events[0]?.url ?? '';
+  for (const k of ['gclid', 'gad_source', 'dclid', 'wbraid', 'gbraid', 'mc_cid', 'igshid']) assert.ok(url.includes(k + '='), k);
+  assert.ok(!url.includes('token'));
 });

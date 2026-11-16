@@ -2,7 +2,7 @@
 
 <!-- Generated from contracts/protocol/fields.json by packages/protocol/scripts/reference.ts. Do not edit. -->
 
-Wire format version 1, revision 1.1. Revisions inside a version only add optional fields; decoders ignore keys they do not know. The decisions behind the format are in ADR-T7N1 and ADR-VJGJ.
+Wire format version 1, revision 1.2. Revisions inside a version only add optional fields; decoders ignore keys they do not know. The decisions behind the format are in ADR-T7N1 and ADR-VJGJ.
 
 A batch is plain text. Line 1 is the header, every following line is one event. A line is a list of `key::value` fields joined by `|`. In values, `%`, `|`, CR and LF are escaped as `%XX`.
 
@@ -26,6 +26,8 @@ A batch is plain text. Line 1 is the header, every following line is one event. 
 | `s` | screen | `screen` | string | - | no | - | 1.0 | Viewport size as WIDTHxHEIGHT in CSS pixels. |
 | `l` | language | `lang` | string | - | no | - | 1.0 | Browser language tag. |
 | `i` | identity | `identity` | string | - | no | - | 1.0 | Identify id supplied by the site; the collector stores only a keyed hash of it. |
+| `tv` | tracker version | `trackerVersion` | string | - | no | - | 1.2 | Version of the tracker script that built the batch. Not the protocol version `v`. Stored per event for diagnosis. |
+| `tz` | timezone offset | `tzOffset` | int | min | no | - | 1.2 | Visitor offset from UTC in minutes at the time of the batch, negative west of UTC (120 for Kyiv in summer, -300 for New York in winter). The zone name is not collected. Used for local-time reports, not for geography. |
 
 ## Event fields
 
@@ -38,6 +40,7 @@ A batch is plain text. Line 1 is the header, every following line is one event. 
 | `u` | url | `url` | string | - | no | all | 1.0 | Page path without query string, except campaign parameters and click ids. |
 | `t` | title | `title` | string | - | no | 0 | 1.0 | Page title. |
 | `r` | referrer | `referrer` | string | - | no | 0 | 1.0 | External referrer as host and path, or an internal path. |
+| `g` | tags | `tags` | list | - | no | all | 1.2 | Short labels on an event, separated by commas. A comma inside a tag is written `%2C`. At most 10 tags of 32 characters; the tracker enforces it and the collector drops the excess. |
 | `p.<name>` | property | `props` | string | - | no | 1, 2 | 1.0 | Custom property. The property name follows `p.` and is escaped (`:` as `%3A`). Values are strings; booleans are 1 and 0. |
 | `et` | engaged time | `engagedMs` | int | ms | no | 3 | 1.1 | Time the page was visible and active before it was left. |
 | `sc` | scroll depth | `scrollPct` | int | percent | no | 3 | 1.1 | Maximum scroll depth reached, 0 to 100. |
@@ -50,7 +53,8 @@ A batch is plain text. Line 1 is the header, every following line is one event. 
 ## Example
 
 ```
-v::1|k::abc|s::1920x1080|l::uk-UA
+v::1|k::abc|s::1920x1080|l::uk-UA|tv::1.4.2|tz::120
 ts::1731150000000|u::/
+d::4000|y::1|n::signup|g::paid,trial|p.plan::pro
 d::8000|y::3|u::/|et::7500|sc::80
 ```

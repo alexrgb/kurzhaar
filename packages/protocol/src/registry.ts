@@ -9,8 +9,8 @@ export interface RegistryField {
   scope: 'header' | 'event';
   /** Event types (`y`) the field is used with; null for header fields. */
   types: 'all' | number[] | null;
-  type: 'string' | 'int' | 'decimal';
-  unit: 'ms' | 'percent' | null;
+  type: 'string' | 'int' | 'decimal' | 'list';
+  unit: 'ms' | 'percent' | 'min' | null;
   required: boolean;
   since: string;
   example: string;

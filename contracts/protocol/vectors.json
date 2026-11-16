@@ -125,6 +125,33 @@
       "error": "invalid number: 12.5"
     },
     {
+      "name": "tags keep an escaped comma inside a tag",
+      "body": "v::1|k::abc\nts::1000|y::1|n::signup|g::signup,paid%2Cplan",
+      "expected": {
+        "key": "abc",
+        "events": [
+          {"ts": 1000, "type": 1, "name": "signup", "tags": ["signup", "paid,plan"], "props": {}}
+        ]
+      }
+    },
+    {
+      "name": "tracker version and negative timezone offset",
+      "body": "v::1|k::abc|tv::1.4.2|tz::-300\nts::1000|u::/",
+      "expected": {
+        "key": "abc",
+        "trackerVersion": "1.4.2",
+        "tzOffset": -300,
+        "events": [
+          {"ts": 1000, "type": 0, "url": "/", "props": {}}
+        ]
+      }
+    },
+    {
+      "name": "timezone offset must be a whole number",
+      "body": "v::1|k::abc|tz::1.5\nts::1000|u::/",
+      "error": "invalid number: 1.5"
+    },
+    {
       "name": "unsupported version",
       "body": "v::9|k::abc\nts::10|u::/",
       "error": "unsupported protocol version"

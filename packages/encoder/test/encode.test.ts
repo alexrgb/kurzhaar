@@ -11,7 +11,9 @@ interface Decoded {
   screen?: string;
   lang?: string;
   identity?: string;
-  events: { ts: number; type: number; name?: string; url?: string; title?: string; referrer?: string; props: Record<string, string>; engagedMs?: number; scrollPct?: number; lcp?: number; inp?: number; cls?: number; fcp?: number; ttfb?: number }[];
+  trackerVersion?: string;
+  tzOffset?: number;
+  events: { tags?: string[]; ts: number; type: number; name?: string; url?: string; title?: string; referrer?: string; props: Record<string, string>; engagedMs?: number; scrollPct?: number; lcp?: number; inp?: number; cls?: number; fcp?: number; ttfb?: number }[];
 }
 interface Vector {
   name: string;
@@ -24,7 +26,7 @@ const { vectors } = JSON.parse(readFileSync(new URL('../../../contracts/protocol
 };
 
 function encodeDecoded(d: Decoded): string {
-  const header: BatchHeader = { key: d.key, screen: d.screen, lang: d.lang, identity: d.identity };
+  const header: BatchHeader = { key: d.key, screen: d.screen, lang: d.lang, identity: d.identity, trackerVersion: d.trackerVersion, tzOffset: d.tzOffset };
   const events: WireEvent[] = d.events.map((e) => ({ ...e, type: e.type as EventType }));
   return encodeBatch(header, events);
 }
@@ -144,26 +146,47 @@ const keysOf = (line: string) => line.split('|').map((p) => p.slice(0, p.indexOf
 
 test('encoder writes only keys that the registry lists', () => {
   const full = {
-    ts: 1, name: 'n', url: '/', title: 't', referrer: 'r', engagedMs: 1, scrollPct: 1, lcp: 1, inp: 1, cls: 0.1, fcp: 1, ttfb: 1, props: { a: 'b' },
+    ts: 1, name: 'n', url: '/', title: 't', referrer: 'r', tags: ['a'], engagedMs: 1, scrollPct: 1, lcp: 1, inp: 1, cls: 0.1, fcp: 1, ttfb: 1, props: { a: 'b' },
   };
   const body = encodeBatch(
-    { key: 'k', screen: '1x1', lang: 'en', identity: 'i' },
+    { key: 'k', screen: '1x1', lang: 'en', identity: 'i', trackerVersion: '1.0.0', tzOffset: -60 },
     [full, { ...full, ts: 2, type: 1 as EventType }, { ...full, ts: 3, type: 3 as EventType }],
   );
   for (const line of body.split('\n')) for (const k of keysOf(line)) assert.ok(allowed(k), `key "${k}" is not in contracts/protocol/fields.json`);
 });
 
 test('the encoder can write every registered key', () => {
-  const header: Record<string, string> = { k: 'key', s: 'screen', l: 'lang', i: 'identity' };
+  const header: Record<string, string> = { k: 'key', s: 'screen', l: 'lang', i: 'identity', tv: 'trackerVersion', tz: 'tzOffset' };
   for (const f of registry.fields.filter((x) => x.scope === 'header' && x.decoded)) {
     const opt = header[f.key];
     assert.ok(opt, `no encoder option for header key ${f.key}`);
-    assert.ok(encodeHeader({ [opt]: f.example } as BatchHeader).includes(`${f.key}::`), f.key);
+    assert.ok(encodeHeader({ [opt]: f.type === 'int' ? Number(f.example) : f.example } as BatchHeader).includes(`${f.key}::`), f.key);
   }
   for (const f of registry.fields.filter((x) => x.scope === 'event' && x.decoded && !x.family && x.key !== 'ts')) {
     const type = (Array.isArray(f.types) ? f.types[0] : 0) as EventType;
-    const value = f.type === 'string' ? f.example : Number(f.example);
+    const value = f.type === 'string' ? f.example : f.type === 'list' ? f.example.split(',') : Number(f.example);
     const line = encodeEvents([{ ts: 1 }, { ts: 2, type, [f.decoded!]: value } as WireEvent])[1]!;
     assert.ok(line.includes(`${f.key}::`), `${f.key} is not written for ${f.decoded}`);
   }
+});
+
+// verifies: REQ-PROTOCOL-GEE0 (tags, tracker version and timezone offset round-trip)
+test('tags: comma inside a tag stays inside, empty tags are dropped, none means no field', () => {
+  const [a, b, c] = encodeEvents([
+    { ts: 1, type: 1, name: 'x', tags: ['signup', 'paid,plan', '', 'a|b', '100%'] },
+    { ts: 2, tags: [] },
+    { ts: 3, tags: [''] },
+  ]);
+  assert.equal(a, 'ts::1|y::1|n::x|g::signup,paid%2Cplan,a%7Cb,100%25');
+  assert.equal(b, 'd::1');
+  assert.equal(c, 'd::1');
+  assert.deepEqual(decode('v::1\n' + a).events[0]?.tags, ['signup', 'paid,plan', 'a|b', '100%']);
+});
+
+test('header: tracker version and a negative timezone offset', () => {
+  assert.equal(encodeHeader({ key: 'k', trackerVersion: '1.4.2', tzOffset: -300 }), 'v::1|k::k|tv::1.4.2|tz::-300');
+  assert.equal(encodeHeader({ tzOffset: 0 }), 'v::1|tz::0');
+  const d = decode(encodeBatch({ trackerVersion: '1.4.2', tzOffset: -300 }, [{ ts: 1 }]));
+  assert.equal(d.trackerVersion, '1.4.2');
+  assert.equal(d.tzOffset, -300);
 });

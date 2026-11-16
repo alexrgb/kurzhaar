@@ -4,6 +4,8 @@
 // data-batch ("false" sends every event immediately; default on: the first event goes out at once,
 // the rest are buffered), data-batch-ms (buffer window after the first event, default 3000)
 type Props = Record<string, unknown>;
+// Tracker version, replaced by esbuild at build time from package.json (wire key `tv`).
+declare const __VERSION__: string;
 interface Ev {
   y: number;
   ts: number;
@@ -11,10 +13,11 @@ interface Ev {
   u?: string;
   t?: string;
   r?: string;
+  g?: string[];
   p?: Props;
 }
 interface Lt {
-  track(name: string, props?: Props): void;
+  track(name: string, props?: Props, tags?: string[]): void;
   identify(id: string, traits?: Props): void;
   flush(): void;
 }
@@ -37,7 +40,7 @@ interface Lt {
     sent = 0;
 
   // Query params kept by default; everything else is stripped client-side (may contain tokens or emails).
-  var KEEP = /^(utm_\w+|gclid|fbclid|msclkid|ttclid|twclid|li_fat_id|ref)$/;
+  var KEEP = /^(utm_\w+|gclid|fbclid|msclkid|ttclid|twclid|li_fat_id|gad_source|dclid|wbraid|gbraid|mc_cid|igshid|ref)$/;
 
   function off(): boolean {
     try {
@@ -65,9 +68,9 @@ interface Lt {
   }
 
   // Wire format v1: one event per line, fields as key::value joined by "|".
-  //   v::1|k::<key>|s::<WxH>|l::<lang>|i::<id>          <- line 1: batch header
+  //   v::1|k::<key>|s::<WxH>|l::<lang>|i::<id>|tv::<version>|tz::<minutes>   <- line 1: batch header
   //   ts::<epoch ms>|u::/|t::Title|r::google.com/        <- first event: full timestamp (pageview, y omitted = 0)
-  //   d::4000|y::1|n::signup|u::/pricing|p.plan::pro     <- next events: delta ms since the previous event
+  //   d::4000|y::1|n::signup|u::/pricing|g::paid,trial|p.plan::pro   <- next events: delta ms since the previous event
   // y: 0 pageview (default, omitted), 1 custom event, 2 identify. Booleans are sent as 1/0.
   // Escaping (values and prop names): % | \n \r -> %XX; prop names also escape ":".
   function esc(v: unknown): string {
@@ -84,12 +87,35 @@ interface Lt {
     return v == null || v === '' ? '' : k + '::' + esc(val(v));
   }
 
+  // Each tag is escaped on its own and "," inside a tag becomes %2C; the joined value is not escaped again.
+  function tagsPair(g?: string[]): string {
+    return g && g.length
+      ? 'g::' +
+          g
+            .map(function (t) {
+              return esc(t).replace(/,/g, '%2C');
+            })
+            .join(',')
+      : '';
+  }
+
+  // At most 10 tags of 32 characters; empty tags are dropped.
+  function tagList(tags?: unknown): string[] | undefined {
+    if (!Array.isArray(tags)) return undefined;
+    var out: string[] = [];
+    for (var i = 0; i < tags.length && out.length < 10; i++) {
+      var t = String(tags[i]).trim().slice(0, 32);
+      if (t) out.push(t);
+    }
+    return out.length ? out : undefined;
+  }
+
   function encode(events: Ev[]): string {
-    var head = ['v::1', pair('k', key), pair('s', d.documentElement.clientWidth + 'x' + d.documentElement.clientHeight), pair('l', nav.language), pair('i', ident)];
+    var head = ['v::1', pair('k', key), pair('s', d.documentElement.clientWidth + 'x' + d.documentElement.clientHeight), pair('l', nav.language), pair('i', ident), pair('tv', __VERSION__), pair('tz', 0 - new Date().getTimezoneOffset())];
     var lines = [head.filter(Boolean).join('|')];
     var prev = 0;
     events.forEach(function (e, n) {
-      var f = [n ? pair('d', e.ts - prev) : pair('ts', e.ts), e.y ? pair('y', e.y) : '', pair('n', e.n), pair('u', e.u), pair('t', e.t), pair('r', e.r)];
+      var f = [n ? pair('d', e.ts - prev) : pair('ts', e.ts), e.y ? pair('y', e.y) : '', pair('n', e.n), pair('u', e.u), pair('t', e.t), pair('r', e.r), tagsPair(e.g)];
       prev = e.ts;
       for (var k in e.p) f.push(pair('p.' + esc(k).replace(/:/g, '%3A'), e.p[k]));
       lines.push(f.filter(Boolean).join('|'));
@@ -135,8 +161,8 @@ interface Lt {
     push({ y: 0, u: path + u.search, t: d.title, r: prev === null ? ref : prev });
   }
 
-  function track(name: string, props?: Props): void {
-    push({ y: 1, n: String(name).slice(0, 64), u: loc.pathname, p: props });
+  function track(name: string, props?: Props, tags?: string[]): void {
+    push({ y: 1, n: String(name).slice(0, 64), u: loc.pathname, p: props, g: tagList(tags) });
   }
 
   function identify(id: string, traits?: Props): void {
@@ -174,7 +200,7 @@ interface Lt {
     });
   }
 
-  // <button data-lt-event="signup" data-lt-plan="pro">: no preventDefault, the beacon survives navigation.
+  // <button data-lt-event="signup" data-lt-tags="paid,trial" data-lt-plan="pro">: no preventDefault, the beacon survives navigation.
   d.addEventListener(
     'click',
     function (e) {
@@ -183,9 +209,10 @@ interface Lt {
       if (!el) return;
       var p: Props = {};
       for (var i = 0, a = el.attributes; i < a.length; i++) {
-        if (a[i].name.indexOf('data-lt-') === 0 && a[i].name !== 'data-lt-event') p[a[i].name.slice(8)] = a[i].value;
+        if (a[i].name.indexOf('data-lt-') === 0 && a[i].name !== 'data-lt-event' && a[i].name !== 'data-lt-tags') p[a[i].name.slice(8)] = a[i].value;
       }
-      track(el.getAttribute('data-lt-event') as string, p);
+      var tg = el.getAttribute('data-lt-tags');
+      track(el.getAttribute('data-lt-event') as string, p, tg ? tg.split(',') : undefined);
     },
     true
   );

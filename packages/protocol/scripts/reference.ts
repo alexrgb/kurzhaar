@@ -38,7 +38,7 @@ export function render(): string {
     }
     lines.push('');
   }
-  lines.push('## Example', '', '```', 'v::1|k::abc|s::1920x1080|l::uk-UA', 'ts::1731150000000|u::/', 'd::8000|y::3|u::/|et::7500|sc::80', '```', '');
+  lines.push('## Example', '', '```', 'v::1|k::abc|s::1920x1080|l::uk-UA|tv::1.4.2|tz::120', 'ts::1731150000000|u::/', 'd::4000|y::1|n::signup|g::paid,trial|p.plan::pro', 'd::8000|y::3|u::/|et::7500|sc::80', '```', '');
   return lines.join('\n');
 }
 
