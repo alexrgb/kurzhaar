@@ -1,0 +1,336 @@
+{
+  "_comment": "Registry of wire format v1 keys (ADR-VJGJ). Every implementation is tested against it; docs/protocol.md is generated from it. Revisions inside v1 only add optional fields (1.1 = ADR-B0B4).",
+  "protocol": 1,
+  "revision": "1.1",
+  "eventTypes": [
+    {
+      "y": 0,
+      "name": "pageview",
+      "status": "active",
+      "since": "1.0",
+      "description": "A page was viewed. `y` is omitted on the wire."
+    },
+    {
+      "y": 1,
+      "name": "custom event",
+      "status": "active",
+      "since": "1.0",
+      "description": "A named event with optional properties."
+    },
+    {
+      "y": 2,
+      "name": "identify",
+      "status": "active",
+      "since": "1.0",
+      "description": "Links the visitor to a site-supplied id."
+    },
+    {
+      "y": 3,
+      "name": "engagement",
+      "status": "active",
+      "since": "1.1",
+      "description": "Sent when a page is left: engaged time and scroll depth."
+    },
+    {
+      "y": 4,
+      "name": "performance",
+      "status": "active",
+      "since": "1.1",
+      "description": "Web Vitals of one page."
+    },
+    {
+      "y": 5,
+      "name": "error",
+      "status": "reserved",
+      "since": "1.1",
+      "description": "Reserved for JavaScript errors; not used yet."
+    }
+  ],
+  "fields": [
+    {
+      "key": "v",
+      "name": "version",
+      "decoded": null,
+      "scope": "header",
+      "types": null,
+      "type": "int",
+      "unit": null,
+      "required": true,
+      "since": "1.0",
+      "example": "1",
+      "description": "Protocol version. Always the first field of the header line; a decoder rejects versions it does not support."
+    },
+    {
+      "key": "k",
+      "name": "project key",
+      "decoded": "key",
+      "scope": "header",
+      "types": null,
+      "type": "string",
+      "unit": null,
+      "required": false,
+      "since": "1.0",
+      "example": "abc",
+      "description": "Public project (site) key that routes the batch to a site."
+    },
+    {
+      "key": "s",
+      "name": "screen",
+      "decoded": "screen",
+      "scope": "header",
+      "types": null,
+      "type": "string",
+      "unit": null,
+      "required": false,
+      "since": "1.0",
+      "example": "1920x1080",
+      "description": "Viewport size as WIDTHxHEIGHT in CSS pixels."
+    },
+    {
+      "key": "l",
+      "name": "language",
+      "decoded": "lang",
+      "scope": "header",
+      "types": null,
+      "type": "string",
+      "unit": null,
+      "required": false,
+      "since": "1.0",
+      "example": "uk-UA",
+      "description": "Browser language tag."
+    },
+    {
+      "key": "i",
+      "name": "identity",
+      "decoded": "identity",
+      "scope": "header",
+      "types": null,
+      "type": "string",
+      "unit": null,
+      "required": false,
+      "since": "1.0",
+      "example": "user-42",
+      "description": "Identify id supplied by the site; the collector stores only a keyed hash of it."
+    },
+    {
+      "key": "ts",
+      "name": "timestamp",
+      "decoded": "ts",
+      "scope": "event",
+      "types": "all",
+      "type": "int",
+      "unit": "ms",
+      "required": true,
+      "since": "1.0",
+      "example": "1731150000000",
+      "description": "Absolute event time, epoch milliseconds. Present on the first event of a batch only."
+    },
+    {
+      "key": "d",
+      "name": "delta",
+      "decoded": null,
+      "scope": "event",
+      "types": "all",
+      "type": "int",
+      "unit": "ms",
+      "required": false,
+      "since": "1.0",
+      "example": "4000",
+      "description": "Milliseconds since the previous event (may be negative). Used on every event after the first; decoders turn it into an absolute `ts`."
+    },
+    {
+      "key": "y",
+      "name": "event type",
+      "decoded": "type",
+      "scope": "event",
+      "types": "all",
+      "type": "int",
+      "unit": null,
+      "required": false,
+      "since": "1.0",
+      "example": "1",
+      "description": "Event type, see the event type table. Omitted for a pageview (0)."
+    },
+    {
+      "key": "n",
+      "name": "event name",
+      "decoded": "name",
+      "scope": "event",
+      "types": [
+        1
+      ],
+      "type": "string",
+      "unit": null,
+      "required": false,
+      "since": "1.0",
+      "example": "signup",
+      "description": "Name of a custom event. Names starting with `$` are reserved for automatic events."
+    },
+    {
+      "key": "u",
+      "name": "url",
+      "decoded": "url",
+      "scope": "event",
+      "types": "all",
+      "type": "string",
+      "unit": null,
+      "required": false,
+      "since": "1.0",
+      "example": "/pricing",
+      "description": "Page path without query string, except campaign parameters and click ids."
+    },
+    {
+      "key": "t",
+      "name": "title",
+      "decoded": "title",
+      "scope": "event",
+      "types": [
+        0
+      ],
+      "type": "string",
+      "unit": null,
+      "required": false,
+      "since": "1.0",
+      "example": "Pricing",
+      "description": "Page title."
+    },
+    {
+      "key": "r",
+      "name": "referrer",
+      "decoded": "referrer",
+      "scope": "event",
+      "types": [
+        0
+      ],
+      "type": "string",
+      "unit": null,
+      "required": false,
+      "since": "1.0",
+      "example": "google.com/",
+      "description": "External referrer as host and path, or an internal path."
+    },
+    {
+      "key": "p.<name>",
+      "name": "property",
+      "decoded": "props",
+      "scope": "event",
+      "types": [
+        1,
+        2
+      ],
+      "type": "string",
+      "unit": null,
+      "required": false,
+      "since": "1.0",
+      "example": "pro",
+      "family": true,
+      "exampleName": "plan",
+      "description": "Custom property. The property name follows `p.` and is escaped (`:` as `%3A`). Values are strings; booleans are 1 and 0."
+    },
+    {
+      "key": "et",
+      "name": "engaged time",
+      "decoded": "engagedMs",
+      "scope": "event",
+      "types": [
+        3
+      ],
+      "type": "int",
+      "unit": "ms",
+      "required": false,
+      "since": "1.1",
+      "example": "7500",
+      "description": "Time the page was visible and active before it was left."
+    },
+    {
+      "key": "sc",
+      "name": "scroll depth",
+      "decoded": "scrollPct",
+      "scope": "event",
+      "types": [
+        3
+      ],
+      "type": "int",
+      "unit": "percent",
+      "required": false,
+      "since": "1.1",
+      "example": "80",
+      "description": "Maximum scroll depth reached, 0 to 100."
+    },
+    {
+      "key": "lcp",
+      "name": "largest contentful paint",
+      "decoded": "lcp",
+      "scope": "event",
+      "types": [
+        4
+      ],
+      "type": "int",
+      "unit": "ms",
+      "required": false,
+      "since": "1.1",
+      "example": "1800",
+      "description": "Web Vitals LCP."
+    },
+    {
+      "key": "inp",
+      "name": "interaction to next paint",
+      "decoded": "inp",
+      "scope": "event",
+      "types": [
+        4
+      ],
+      "type": "int",
+      "unit": "ms",
+      "required": false,
+      "since": "1.1",
+      "example": "120",
+      "description": "Web Vitals INP."
+    },
+    {
+      "key": "cls",
+      "name": "cumulative layout shift",
+      "decoded": "cls",
+      "scope": "event",
+      "types": [
+        4
+      ],
+      "type": "decimal",
+      "unit": null,
+      "required": false,
+      "since": "1.1",
+      "example": "0.05",
+      "description": "Web Vitals CLS, a unitless decimal."
+    },
+    {
+      "key": "fcp",
+      "name": "first contentful paint",
+      "decoded": "fcp",
+      "scope": "event",
+      "types": [
+        4
+      ],
+      "type": "int",
+      "unit": "ms",
+      "required": false,
+      "since": "1.1",
+      "example": "900",
+      "description": "Web Vitals FCP."
+    },
+    {
+      "key": "ttfb",
+      "name": "time to first byte",
+      "decoded": "ttfb",
+      "scope": "event",
+      "types": [
+        4
+      ],
+      "type": "int",
+      "unit": "ms",
+      "required": false,
+      "since": "1.1",
+      "example": "200",
+      "description": "Web Vitals TTFB."
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+# Wire format reference
+
+<!-- Generated from contracts/protocol/fields.json by packages/protocol/scripts/reference.ts. Do not edit. -->
+
+Wire format version 1, revision 1.1. Revisions inside a version only add optional fields; decoders ignore keys they do not know. The decisions behind the format are in ADR-T7N1 and ADR-VJGJ.
+
+A batch is plain text. Line 1 is the header, every following line is one event. A line is a list of `key::value` fields joined by `|`. In values, `%`, `|`, CR and LF are escaped as `%XX`.
+
+## Event types
+
+| `y` | Name | Status | Since | Description |
+|---|---|---|---|---|
+| 0 | pageview | active | 1.0 | A page was viewed. `y` is omitted on the wire. |
+| 1 | custom event | active | 1.0 | A named event with optional properties. |
+| 2 | identify | active | 1.0 | Links the visitor to a site-supplied id. |
+| 3 | engagement | active | 1.1 | Sent when a page is left: engaged time and scroll depth. |
+| 4 | performance | active | 1.1 | Web Vitals of one page. |
+| 5 | error | reserved | 1.1 | Reserved for JavaScript errors; not used yet. |
+
+## Header fields
+
+| Key | Name | Decoded as | Type | Unit | Required | Event types | Since | Description |
+|---|---|---|---|---|---|---|---|---|
+| `v` | version | - | int | - | yes | - | 1.0 | Protocol version. Always the first field of the header line; a decoder rejects versions it does not support. |
+| `k` | project key | `key` | string | - | no | - | 1.0 | Public project (site) key that routes the batch to a site. |
+| `s` | screen | `screen` | string | - | no | - | 1.0 | Viewport size as WIDTHxHEIGHT in CSS pixels. |
+| `l` | language | `lang` | string | - | no | - | 1.0 | Browser language tag. |
+| `i` | identity | `identity` | string | - | no | - | 1.0 | Identify id supplied by the site; the collector stores only a keyed hash of it. |
+
+## Event fields
+
+| Key | Name | Decoded as | Type | Unit | Required | Event types | Since | Description |
+|---|---|---|---|---|---|---|---|---|
+| `ts` | timestamp | `ts` | int | ms | yes | all | 1.0 | Absolute event time, epoch milliseconds. Present on the first event of a batch only. |
+| `d` | delta | - | int | ms | no | all | 1.0 | Milliseconds since the previous event (may be negative). Used on every event after the first; decoders turn it into an absolute `ts`. |
+| `y` | event type | `type` | int | - | no | all | 1.0 | Event type, see the event type table. Omitted for a pageview (0). |
+| `n` | event name | `name` | string | - | no | 1 | 1.0 | Name of a custom event. Names starting with `$` are reserved for automatic events. |
+| `u` | url | `url` | string | - | no | all | 1.0 | Page path without query string, except campaign parameters and click ids. |
+| `t` | title | `title` | string | - | no | 0 | 1.0 | Page title. |
+| `r` | referrer | `referrer` | string | - | no | 0 | 1.0 | External referrer as host and path, or an internal path. |
+| `p.<name>` | property | `props` | string | - | no | 1, 2 | 1.0 | Custom property. The property name follows `p.` and is escaped (`:` as `%3A`). Values are strings; booleans are 1 and 0. |
+| `et` | engaged time | `engagedMs` | int | ms | no | 3 | 1.1 | Time the page was visible and active before it was left. |
+| `sc` | scroll depth | `scrollPct` | int | percent | no | 3 | 1.1 | Maximum scroll depth reached, 0 to 100. |
+| `lcp` | largest contentful paint | `lcp` | int | ms | no | 4 | 1.1 | Web Vitals LCP. |
+| `inp` | interaction to next paint | `inp` | int | ms | no | 4 | 1.1 | Web Vitals INP. |
+| `cls` | cumulative layout shift | `cls` | decimal | - | no | 4 | 1.1 | Web Vitals CLS, a unitless decimal. |
+| `fcp` | first contentful paint | `fcp` | int | ms | no | 4 | 1.1 | Web Vitals FCP. |
+| `ttfb` | time to first byte | `ttfb` | int | ms | no | 4 | 1.1 | Web Vitals TTFB. |
+
+## Example
+
+```
+v::1|k::abc|s::1920x1080|l::uk-UA
+ts::1731150000000|u::/
+d::8000|y::3|u::/|et::7500|sc::80
+```
