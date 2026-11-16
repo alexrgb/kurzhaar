@@ -23,6 +23,23 @@ Collection and detection are separate:
 - **Bots** are flagged by the detector and excluded from metrics by default, not counted as `other`.
 - **Raw signals are never stored or queued.** The collector discards the User-Agent, Client Hints and the tracker's raw signals right after detection, as ADR-B0B4 already requires for the User-Agent. Only the detected classes and major versions are enqueued.
 
+## Wire keys and timing
+
+Revision 1.3 of the wire format (the field registry, ADR-VJGJ) assigns these optional header fields:
+
+| Key | Signal | Example |
+|---|---|---|
+| `cb` | Client-hint brands with major versions, a list written `Brand/major` (the major version follows the last slash) | `Chromium/124,Google Chrome/124` |
+| `cm` | Mobile flag, 1 or 0 | `0` |
+| `cp` | Platform | `Windows` |
+| `cv` | Major version of the platform version only, not the full string | `15` |
+| `tp` | Maximum touch points | `0` |
+| `pc` | Primary pointer is coarse, 1 or 0 | `0` |
+
+Only the major platform version is sent. It is enough to tell Windows 11 (13 and above) from Windows 10, and a full version string would add entropy for no gain.
+
+`navigator.userAgentData` brands, mobile flag and platform are readable at once, but the platform version is asked for asynchronously. The tracker waits at most 150 ms for it before the first send of a page load and not at all where the browser has no client hints; if the answer comes later it is added to the following batches. This slightly bends the "first event immediate" rule (ADR-WXH3) in Chromium only, and the bound keeps it small.
+
 ## Consequences
 
 - Detection rules can improve without touching any tracker; a collector upgrade or a detector swap is enough.

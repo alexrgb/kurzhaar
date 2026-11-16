@@ -7,11 +7,11 @@ links:
     - ADR-ZKD1
 ---
 ### Requirement: The tracker sends the raw signals that device detection needs
-The system SHALL make the tracker send the client-hint brands, mobile flag, platform, platform version, maximum touch points and primary pointer type as optional header fields, and nothing that identifies a device model.
+The system SHALL make the tracker send the client-hint brands, mobile flag, platform, the major version of the platform version, maximum touch points and primary pointer type as optional header fields, and nothing that identifies a device model.
 
 #### Scenario: Chromium browser {#S1}
 - **WHEN** the browser exposes `navigator.userAgentData`
-- **THEN** the batch header carries brands, mobile flag, platform and platform version
+- **THEN** the batch header carries brands, mobile flag, platform and the major platform version
 
 #### Scenario: Browser without client hints {#S2}
 - **WHEN** the browser exposes no `navigator.userAgentData`
