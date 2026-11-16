@@ -2,7 +2,8 @@
 // Config (script attributes): data-key (required), data-host, data-query ("all"|"none"; default: utm/click ids only),
 // data-auto ("false" disables automatic page views), data-dnt ("true" honours Do Not Track),
 // data-batch ("false" sends every event immediately; default on: the first event goes out at once,
-// the rest are buffered), data-batch-ms (buffer window after the first event, default 3000)
+// the rest are buffered), data-batch-ms (buffer window after the first event, default 3000),
+// data-engagement and data-vitals ("false" switches engagement events or Web Vitals off)
 type Props = Record<string, unknown>;
 // Tracker version, replaced by esbuild at build time from package.json (wire key `tv`).
 declare const __VERSION__: string;
@@ -21,8 +22,17 @@ interface Ev {
   t?: string;
   r?: string;
   g?: string[];
+  et?: number;
+  sc?: number;
+  lcp?: number;
+  inp?: number;
+  cls?: number;
+  fcp?: number;
+  ttfb?: number;
   p?: Props;
 }
+// Performance and layout-shift entries carry fields the DOM typings do not list.
+type Pe = PerformanceEntry & { hadRecentInput?: boolean; interactionId?: number; value?: number };
 interface Lt {
   track(name: string, props?: Props, tags?: string[]): void;
   identify(id: string, traits?: Props): void;
@@ -44,6 +54,18 @@ interface Lt {
     timer: ReturnType<typeof setTimeout> | 0 = 0,
     ident: string | undefined,
     lastPath: string | null = null,
+    firstPath: string | null = null,
+    // Engagement (ADR-9G74): visible time and maximum scroll depth since the last send.
+    vis = d.visibilityState !== 'hidden',
+    since = Date.now(),
+    acc = 0,
+    maxSc = 0,
+    // Web Vitals of the initial page load, sent once.
+    vit: { lcp?: number; inp?: number; cls?: number; fcp?: number; ttfb?: number } = {},
+    vitSent = 0,
+    clsRun = 0,
+    clsLast = 0,
+    clsStart = 0,
     sent = 0,
     // Device signals for server-side detection (ADR-ZKD1). `cv` (platform major version) is async.
     uad = (nav as Navigator & { userAgentData?: Uad }).userAgentData,
@@ -141,7 +163,7 @@ interface Lt {
     var lines = [head.filter(Boolean).join('|')];
     var prev = 0;
     events.forEach(function (e, n) {
-      var f = [n ? pair('d', e.ts - prev) : pair('ts', e.ts), e.y ? pair('y', e.y) : '', pair('n', e.n), pair('u', e.u), pair('t', e.t), pair('r', e.r), listPair('g', e.g)];
+      var f = [n ? pair('d', e.ts - prev) : pair('ts', e.ts), e.y ? pair('y', e.y) : '', pair('n', e.n), pair('u', e.u), pair('t', e.t), pair('r', e.r), listPair('g', e.g), pair('et', e.et), pair('sc', e.sc), pair('lcp', e.lcp), pair('inp', e.inp), pair('cls', e.cls), pair('fcp', e.fcp), pair('ttfb', e.ttfb)];
       prev = e.ts;
       for (var k in e.p) f.push(pair('p.' + esc(k).replace(/:/g, '%3A'), e.p[k]));
       lines.push(f.filter(Boolean).join('|'));
@@ -202,6 +224,81 @@ interface Lt {
     }
   }
 
+  // Maximum scroll depth in whole percent: (scroll position + viewport) / document height.
+  function scrolled(): void {
+    var e = d.documentElement;
+    var p = Math.min(100, Math.round((((w.pageYOffset as number) || 0) + e.clientHeight) * 100 / Math.max(e.scrollHeight, 1)));
+    if (p > maxSc) maxSc = p;
+  }
+
+  // Sends engagement for `path` (visible time and scroll depth since the last send), then restarts both counters.
+  function engage(path: string | null): void {
+    var n = Date.now();
+    if (vis) acc += n - since;
+    since = n;
+    var et = Math.round(acc), sc = maxSc;
+    acc = maxSc = 0;
+    if (path !== null && et > 0 && s.getAttribute('data-engagement') !== 'false') push({ y: 3, u: path, et: et, sc: sc });
+  }
+
+  function vitals(): void {
+    if (vitSent || firstPath === null || s.getAttribute('data-vitals') === 'false') return;
+    vitSent = 1;
+    try {
+      var nt = w.performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+      if (nt && nt.responseStart > 0) vit.ttfb = Math.round(nt.responseStart);
+    } catch (e) {}
+    if (vit.lcp !== undefined || vit.inp !== undefined || vit.cls !== undefined || vit.fcp !== undefined || vit.ttfb !== undefined)
+      push({ y: 4, u: firstPath, lcp: vit.lcp, inp: vit.inp, cls: vit.cls, fcp: vit.fcp, ttfb: vit.ttfb });
+  }
+
+  var PO = (w as unknown as { PerformanceObserver?: typeof PerformanceObserver }).PerformanceObserver;
+
+  function watch(type: string, f: (e: Pe) => void, min?: number): void {
+    try {
+      new (PO as typeof PerformanceObserver)(function (l: PerformanceObserverEntryList) {
+        (l.getEntries() as Pe[]).forEach(f);
+      }).observe({ type: type, buffered: true, durationThreshold: min } as PerformanceObserverInit);
+    } catch (e) {}
+  }
+
+  // The page is hidden or going away: send what is counted so far.
+  function leave(): void {
+    scrolled();
+    engage(lastPath);
+    vis = false;
+    vitals();
+    flush();
+  }
+
+  if (s.getAttribute('data-vitals') !== 'false' && PO) {
+    watch('largest-contentful-paint', function (e) {
+      vit.lcp = Math.round(e.startTime);
+    });
+    watch('paint', function (e) {
+      if (e.name === 'first-contentful-paint') vit.fcp = Math.round(e.startTime);
+    });
+    // Layout shifts without recent input form session windows (gap under 1 s, window under 5 s); CLS is the largest.
+    watch('layout-shift', function (e) {
+      if (e.hadRecentInput) return;
+      if (e.startTime - clsLast < 1000 && e.startTime - clsStart < 5000) clsRun += e.value as number;
+      else {
+        clsRun = e.value as number;
+        clsStart = e.startTime;
+      }
+      clsLast = e.startTime;
+      if (clsRun > (vit.cls || 0)) vit.cls = Math.round(clsRun * 1000) / 1000;
+    });
+    // The longest interaction, a simplification of the 98th percentile (ADR-9G74).
+    watch(
+      'event',
+      function (e) {
+        if (e.interactionId && e.duration > (vit.inp || 0)) vit.inp = Math.round(e.duration);
+      },
+      40
+    );
+  }
+
   function view(ref?: string): void {
     var u = clean(loc.href);
     if (!u) return;
@@ -209,7 +306,10 @@ interface Lt {
     // Only a pathname change is a new page; query-only changes (filters, tabs) are not.
     if (path === lastPath) return;
     var prev = lastPath;
+    engage(prev);
     lastPath = path;
+    if (firstPath === null) firstPath = path;
+    scrolled();
     push({ y: 0, u: path + u.search, t: d.title, r: prev === null ? ref : prev });
   }
 
@@ -270,7 +370,13 @@ interface Lt {
   );
 
   d.addEventListener('visibilitychange', function () {
-    if (d.visibilityState === 'hidden') flush();
+    if (d.visibilityState === 'hidden') leave();
+    else if (!vis) {
+      vis = true;
+      since = Date.now();
+    }
   });
-  w.addEventListener('pagehide', flush);
+  w.addEventListener('pagehide', leave);
+  w.addEventListener('scroll', scrolled, { passive: true });
+  w.addEventListener('load', scrolled);
 })(window, document);
