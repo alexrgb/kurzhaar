@@ -5,6 +5,7 @@ use axum::Router;
 use http_body_util::BodyExt;
 use kurzhaar_collector::config::{Config, Site};
 use kurzhaar_collector::{public_router, AppState};
+use kurzhaar_core::detect::{CachedDetector, UaparserDetector};
 use kurzhaar_queue::MemoryQueue;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -18,6 +19,20 @@ struct Rig {
     state: Arc<AppState>,
 }
 
+fn detector() -> Arc<CachedDetector<UaparserDetector>> {
+    // Parsing the rules takes a moment, so the tests share one.
+    static D: std::sync::OnceLock<Arc<CachedDetector<UaparserDetector>>> =
+        std::sync::OnceLock::new();
+    D.get_or_init(|| {
+        Arc::new(CachedDetector::new(
+            UaparserDetector::builtin().unwrap(),
+            100,
+            std::time::Duration::from_secs(60),
+        ))
+    })
+    .clone()
+}
+
 fn rig_with(edit: impl FnOnce(&mut Config)) -> Rig {
     let mut config = Config {
         sites: vec![Site {
@@ -28,7 +43,9 @@ fn rig_with(edit: impl FnOnce(&mut Config)) -> Rig {
     };
     edit(&mut config);
     let queue = Arc::new(MemoryQueue::new());
-    let state = Arc::new(AppState::new(config, queue.clone(), Arc::new(|| NOW)).expect("config"));
+    let state = Arc::new(
+        AppState::new(config, queue.clone(), detector(), Arc::new(|| NOW)).expect("config"),
+    );
     Rig {
         app: public_router(state.clone()),
         queue,
@@ -258,7 +275,6 @@ async fn envelope_carries_no_address_or_client_signals() {
         "203.0.113.77",
         "SecretAgent",
         "Chromium",
-        "Windows",
         "client_brands",
         "abc\"",
     ] {
@@ -440,4 +456,140 @@ async fn address_is_not_logged() {
     send(&r, post("v::1|k::abc\nts::1|u::/", "203.0.113.77")).await;
     let text = String::from_utf8(logs.0.lock().unwrap().clone()).unwrap();
     assert!(!text.contains("203.0.113.77"), "{text}");
+}
+
+fn post_ua(body: &str, ua: &str, extra: &[(&str, &str)]) -> Request<Body> {
+    let mut req = post(body, "203.0.113.5");
+    req.headers_mut()
+        .insert(header::USER_AGENT, ua.parse().unwrap());
+    for (k, v) in extra {
+        req.headers_mut().insert(
+            axum::http::HeaderName::from_bytes(k.as_bytes()).unwrap(),
+            v.parse().unwrap(),
+        );
+    }
+    req
+}
+
+const WIN_CHROME: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+// verifies: REQ-COLLECT-QZRJ.S1 (the queued event holds names and major versions only and no User-Agent)
+// verifies: REQ-COLLECT-RA57.S1 (no User-Agent, client-hint or touch-point value is queued)
+// verifies: REQ-COLLECT-X6WF.S1 (platform Windows with platform version 13 or higher is Windows 11)
+#[tokio::test]
+async fn the_envelope_holds_detected_classes_and_no_raw_signals() {
+    let r = rig();
+    let body = "v::1|k::abc|cb::Chromium/124,Google Chrome/124|cm::0|cp::Windows|cv::15|tp::7|pc::0\nts::1|u::/";
+    send(&r, post_ua(body, WIN_CHROME, &[])).await;
+    let raw = String::from_utf8(r.queue.messages()[0].payload.clone()).unwrap();
+    let m = &queued(&r)[0];
+    assert_eq!(
+        (m["browser"].as_str(), m["browser_major"].as_u64()),
+        (Some("Chrome"), Some(124))
+    );
+    assert_eq!(
+        (m["os"].as_str(), m["os_major"].as_u64()),
+        (Some("Windows"), Some(11))
+    );
+    assert_eq!(m["device"], "desktop");
+    assert_eq!(m["bot"], false);
+    for needle in [
+        "Mozilla",
+        "AppleWebKit",
+        "Chromium",
+        "124.0.0.0",
+        "touch",
+        "client_",
+        "\"tp\"",
+        "\"cv\"",
+    ] {
+        assert!(!raw.contains(needle), "envelope leaks {needle}: {raw}");
+    }
+}
+
+// verifies: REQ-COLLECT-X6WF.S2 (Macintosh with several touch points and a coarse pointer is a tablet)
+#[tokio::test]
+async fn ipad_in_desktop_mode_is_a_tablet() {
+    let r = rig();
+    let ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15";
+    send(&r, post_ua("v::1|k::abc|tp::5|pc::1\nts::1|u::/", ua, &[])).await;
+    assert_eq!(queued(&r)[0]["device"], "tablet");
+}
+
+// verifies: REQ-COLLECT-X6WF.S3 (another detector is used without changes to the tracker or the queue format)
+#[tokio::test]
+async fn another_detector_can_be_plugged_in() {
+    use kurzhaar_core::detect::{Detection, Detector, DeviceClass, Signals};
+    struct Fixed;
+    impl Detector for Fixed {
+        fn detect(&self, _: &Signals) -> Detection {
+            Detection {
+                browser: "Mine".into(),
+                browser_major: Some(1),
+                os: "MyOS".into(),
+                os_major: None,
+                device: DeviceClass::Other,
+                bot: false,
+            }
+        }
+    }
+    let queue = Arc::new(MemoryQueue::new());
+    let config = Config {
+        sites: vec![Site {
+            key: "abc".into(),
+            id: "site-1".into(),
+        }],
+        ..Config::default()
+    };
+    let state =
+        Arc::new(AppState::new(config, queue.clone(), Arc::new(Fixed), Arc::new(|| NOW)).unwrap());
+    let r = Rig {
+        app: public_router(state.clone()),
+        queue,
+        state,
+    };
+    send(&r, post(BATCH, "203.0.113.5")).await;
+    assert_eq!(queued(&r)[0]["browser"], "Mine");
+}
+
+// verifies: REQ-COLLECT-1AYR.S1 (a crawler is flagged and is not device class other)
+// verifies: REQ-COLLECT-1AYR.S2 (a headless browser is flagged)
+// verifies: REQ-COLLECT-1AYR.S3 (an ordinary browser is not flagged)
+#[tokio::test]
+async fn bots_are_flagged_and_browsers_are_not() {
+    let r = rig();
+    send(
+        &r,
+        post_ua(
+            BATCH,
+            "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+            &[],
+        ),
+    )
+    .await;
+    send(&r, post_ua(BATCH, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/124.0.0.0 Safari/537.36", &[])).await;
+    send(&r, post_ua(BATCH, WIN_CHROME, &[])).await;
+    let q = queued(&r);
+    assert_eq!(q[0]["bot"], true);
+    assert_ne!(q[0]["device"], "other");
+    assert_eq!(q[1]["bot"], true);
+    assert_eq!(q[2]["bot"], false);
+}
+
+// verifies: REQ-COLLECT-X6WF.S1 (the Client Hints headers fill what the tracker did not send)
+#[tokio::test]
+async fn client_hint_headers_fill_missing_signals() {
+    let r = rig();
+    let hints = [
+        (
+            "sec-ch-ua",
+            "\"Chromium\";v=\"124\", \"Microsoft Edge\";v=\"124\", \"Not-A.Brand\";v=\"99\"",
+        ),
+        ("sec-ch-ua-mobile", "?0"),
+        ("sec-ch-ua-platform", "\"Windows\""),
+    ];
+    send(&r, post_ua(BATCH, WIN_CHROME, &hints)).await;
+    let m = &queued(&r)[0];
+    assert_eq!(m["browser"], "Edge");
+    assert_eq!(m["os"], "Windows");
 }

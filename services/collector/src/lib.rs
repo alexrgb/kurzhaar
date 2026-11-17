@@ -4,6 +4,7 @@ pub mod clientip;
 pub mod config;
 pub mod envelope;
 pub mod ratelimit;
+pub mod signals;
 
 use axum::body::{to_bytes, Body};
 use axum::extract::{ConnectInfo, State};
@@ -14,6 +15,7 @@ use axum::routing::{get, post};
 use axum::Router;
 use config::Config;
 use ipnet::IpNet;
+use kurzhaar_core::detect::Detector;
 use kurzhaar_queue::Queue;
 use ratelimit::RateLimiter;
 use std::collections::HashMap;
@@ -68,13 +70,19 @@ pub struct AppState {
     pub sites: HashMap<String, String>,
     pub trusted: Vec<IpNet>,
     pub queue: Arc<dyn Queue>,
+    pub detector: Arc<dyn Detector>,
     pub limiter: RateLimiter,
     pub metrics: Arc<Metrics>,
     pub clock: Clock,
 }
 
 impl AppState {
-    pub fn new(config: Config, queue: Arc<dyn Queue>, clock: Clock) -> Result<AppState, String> {
+    pub fn new(
+        config: Config,
+        queue: Arc<dyn Queue>,
+        detector: Arc<dyn Detector>,
+        clock: Clock,
+    ) -> Result<AppState, String> {
         config.validate()?;
         Ok(AppState {
             sites: config
@@ -91,6 +99,7 @@ impl AppState {
             metrics: Arc::new(Metrics::default()),
             config,
             queue,
+            detector,
             clock,
         })
     }
@@ -161,6 +170,7 @@ async fn collect(State(s): State<Arc<AppState>>, req: Request<Body>) -> Response
         .get("x-forwarded-for")
         .and_then(|v| v.to_str().ok());
     let client = clientip::resolve(peer, forwarded, &s.trusted);
+    let headers = req.headers().clone();
 
     if let Err(wait) = s.limiter.check(client, now) {
         s.metrics.rate_limited.fetch_add(1, Ordering::Relaxed);
@@ -196,8 +206,10 @@ async fn collect(State(s): State<Arc<AppState>>, req: Request<Body>) -> Response
         return StatusCode::ACCEPTED.into_response();
     };
 
+    // The User-Agent and the signals are used here and dropped with the request (REQ-COLLECT-RA57).
+    let detection = s.detector.detect(&signals::from_request(&batch, &headers));
     let token = envelope::token(&key, &body);
-    let message = envelope::build(batch, site, token, now);
+    let message = envelope::build(batch, site, token, now, detection);
     let payload = match serde_json::to_vec(&message) {
         Ok(p) => p,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
