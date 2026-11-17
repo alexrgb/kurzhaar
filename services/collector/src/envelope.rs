@@ -1,3 +1,4 @@
+// spec: REQ-COLLECT-X0AM, REQ-COLLECT-8J26, REQ-COLLECT-J4S5, REQ-COLLECT-SD26
 //! The message the collector writes to the queue, one per accepted batch (ADR-K8N9, ADR-D3BB).
 //! It carries no address, User-Agent, Client Hints or raw tracker signals.
 
