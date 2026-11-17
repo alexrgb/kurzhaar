@@ -43,6 +43,9 @@ async fn main() {
         ),
         Err(e) => fail(&e),
     };
+    tracing::warn!(
+        "salts are kept in memory: sessions are not shared between replicas and restart with the process"
+    );
     let country = match &config.country_db {
         Some(path) => match CountryDb::open(path) {
             Ok(db) => Arc::new(db),

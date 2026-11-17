@@ -21,3 +21,12 @@ The system SHALL delete a session salt no later than ten minutes after the end o
 #### Scenario: Memory-only salt {#S3}
 - **WHEN** no salt source is configured
 - **THEN** the collector creates a random salt per UTC day in memory and logs once that sessions are not shared between replicas
+
+#### Scenario: Salt creation is random {#S4}
+- **WHEN** the collector creates a salt in memory
+- **THEN** it is 32 bytes from the operating system's random generator, and two collectors create different salts
+
+#### Scenario: Next day available at midnight {#S5}
+- **WHEN** a request arrives in the first second of a UTC day
+- **THEN** the day's salt exists and the request is not delayed or rejected
+
