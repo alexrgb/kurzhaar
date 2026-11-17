@@ -37,6 +37,15 @@ Use one queue profile at a time (ADR GTN9). Stop with `docker compose down`; add
 
 ClickHouse is heavy for small installs. The `minimal` profile therefore caps the server at 50% of host RAM (`max_server_memory_usage_to_ram_ratio`), shrinks caches and background pools, limits each query to 2 GB and 2 threads (spilling to disk beyond 500 MB for GROUP BY and sort), and drops the noisy system log tables (`query_log` and `part_log` keep 7 days). In `full`, each of the three servers is capped at 30% of RAM, so the three together stay under the host limit. Edit `compose/clickhouse/*/config.xml` and `users.xml` to tune. Expect roughly 100 MB idle for the single server; real usage depends on data volume. This was not load-tested.
 
+## Country database
+
+The collector derives the visitor's country from an MMDB file that you provide; Kurzhaar ships none. Without one, events carry no country and the collector warns at start. Set `country_db` in the collector's TOML file or `KURZHAAR_COLLECTOR_COUNTRY_DB` to the file's path. Only the ISO country code is read, so a city database works but does not add detail.
+
+- **DB-IP Lite Country** (recommended): free, no account, updated monthly, licence CC BY 4.0. If you publish anything derived from it you must credit "IP Geolocation by DB-IP" with a link to https://db-ip.com. Download the `.mmdb` from https://db-ip.com/db/download/ip-to-country-lite.
+- **MaxMind GeoLite2 Country**: needs a free account and licence key, and its licence does not allow you to pass the file on.
+
+The collector checks the file once a minute and starts using a replaced file without a restart. If the replacement cannot be opened, the previous database stays in use and `kurzhaar_collector_country_db_reload_failures_total` rises. A path that cannot be opened at start stops the collector. Replace the file by writing it under another name and renaming it over the old one.
+
 ## Ports
 
 All ports bind to `127.0.0.1` by default. Set `BIND_ADDRESS=0.0.0.0` only behind a firewall.

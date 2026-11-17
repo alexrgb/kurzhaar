@@ -20,6 +20,8 @@ pub struct Envelope {
     pub screen: Option<String>,
     pub lang: Option<String>,
     pub identity: Option<String>,
+    /// ISO 3166-1 alpha-2 code from the country database, empty when unknown (REQ-COLLECT-82NX).
+    pub country: Option<String>,
     /// Browser, OS, device class and bot flag, names and major versions only.
     #[serde(flatten)]
     pub detection: Detection,
@@ -66,6 +68,7 @@ pub fn build(
     token: String,
     received_at: u64,
     detection: Detection,
+    country: Option<String>,
 ) -> Envelope {
     let times = event_times(&batch.events, received_at);
     let events = batch
@@ -88,6 +91,7 @@ pub fn build(
         screen: batch.screen,
         lang: batch.lang,
         identity: batch.identity,
+        country,
         detection,
         events,
     }

@@ -30,6 +30,8 @@ pub struct Config {
     /// Detection results kept by the tuple of signals (REQ-COLLECT-4THR).
     pub detector_cache_entries: usize,
     pub detector_cache_seconds: u64,
+    /// MMDB country database; unset means events carry no country (REQ-COLLECT-82NX).
+    pub country_db: Option<String>,
     /// Sites known to this collector until the registry is read from Postgres.
     pub sites: Vec<Site>,
 }
@@ -47,6 +49,7 @@ impl Default for Config {
             rate_limit_max_entries: 100_000,
             detector_cache_entries: 10_000,
             detector_cache_seconds: 3600,
+            country_db: None,
             sites: Vec::new(),
         }
     }
@@ -89,6 +92,9 @@ impl Config {
         }
         if let Some(v) = get("DETECTOR_CACHE_SECONDS") {
             c.detector_cache_seconds = number("DETECTOR_CACHE_SECONDS", &v)?;
+        }
+        if let Some(v) = get("COUNTRY_DB") {
+            c.country_db = Some(v).filter(|v| !v.is_empty());
         }
         if let Some(v) = get("SITES") {
             c.sites = sites(&v)?;

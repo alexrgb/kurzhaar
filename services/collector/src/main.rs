@@ -1,5 +1,6 @@
 use kurzhaar_collector::config::Config;
-use kurzhaar_collector::{metrics_router, public_router, system_clock, AppState};
+use kurzhaar_collector::country::CountryDb;
+use kurzhaar_collector::{metrics_router, public_router, refresh_country, system_clock, AppState};
 use kurzhaar_core::detect::{CachedDetector, UaparserDetector};
 use kurzhaar_queue::MemoryQueue;
 use std::net::SocketAddr;
@@ -42,15 +43,35 @@ async fn main() {
         ),
         Err(e) => fail(&e),
     };
+    let country = match &config.country_db {
+        Some(path) => match CountryDb::open(path) {
+            Ok(db) => Arc::new(db),
+            Err(e) => fail(&format!("country_db: {e}")),
+        },
+        None => {
+            tracing::warn!("no country database configured: events carry no country");
+            Arc::new(CountryDb::disabled())
+        }
+    };
     let state = match AppState::new(
         config,
         Arc::new(MemoryQueue::new()),
         Arc::new(detector),
         system_clock(),
     ) {
-        Ok(s) => Arc::new(s),
+        Ok(s) => Arc::new(s.with_country(country.clone())),
         Err(e) => fail(&e),
     };
+    if country.is_enabled() {
+        let metrics = state.metrics.clone();
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(60));
+            loop {
+                tick.tick().await;
+                refresh_country(&country, &metrics);
+            }
+        });
+    }
 
     let metrics_app = metrics_router(state.metrics.clone());
     let metrics_listener = tokio::net::TcpListener::bind(metrics)
