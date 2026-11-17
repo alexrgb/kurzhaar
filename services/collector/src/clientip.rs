@@ -1,3 +1,4 @@
+// spec: REQ-COLLECT-GZF5
 //! The client address (REQ-COLLECT-GZF5). It is used in memory for one request and never written
 //! anywhere (ADR-D3BB).
 

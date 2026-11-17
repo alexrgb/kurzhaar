@@ -1,6 +1,8 @@
+// spec: REQ-COLLECT-X0AM, REQ-COLLECT-8J26, REQ-COLLECT-J4S5, REQ-COLLECT-SD26
 //! The message the collector writes to the queue, one per accepted batch (ADR-K8N9, ADR-D3BB).
 //! It carries no address, User-Agent, Client Hints or raw tracker signals.
 
+use kurzhaar_core::detect::Detection;
 use kurzhaar_protocol::{Batch, Event};
 use serde::Serialize;
 
@@ -18,6 +20,9 @@ pub struct Envelope {
     pub screen: Option<String>,
     pub lang: Option<String>,
     pub identity: Option<String>,
+    /// Browser, OS, device class and bot flag, names and major versions only.
+    #[serde(flatten)]
+    pub detection: Detection,
     /// Events with `ts` replaced by the server-derived time (REQ-COLLECT-8J26).
     pub events: Vec<Event>,
 }
@@ -55,7 +60,13 @@ fn limit_tags(tags: Vec<String>) -> Vec<String> {
         .collect()
 }
 
-pub fn build(batch: Batch, site: &str, token: String, received_at: u64) -> Envelope {
+pub fn build(
+    batch: Batch,
+    site: &str,
+    token: String,
+    received_at: u64,
+    detection: Detection,
+) -> Envelope {
     let times = event_times(&batch.events, received_at);
     let events = batch
         .events
@@ -77,6 +88,7 @@ pub fn build(batch: Batch, site: &str, token: String, received_at: u64) -> Envel
         screen: batch.screen,
         lang: batch.lang,
         identity: batch.identity,
+        detection,
         events,
     }
 }
