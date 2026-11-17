@@ -2,6 +2,7 @@
 
 pub mod clientip;
 pub mod config;
+pub mod country;
 pub mod envelope;
 pub mod ratelimit;
 pub mod signals;
@@ -14,6 +15,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::Router;
 use config::Config;
+use country::{CountryDb, Reload};
 use ipnet::IpNet;
 use kurzhaar_core::detect::Detector;
 use kurzhaar_queue::Queue;
@@ -32,6 +34,8 @@ pub struct Metrics {
     pub oversized: AtomicU64,
     pub rate_limited: AtomicU64,
     pub queue_errors: AtomicU64,
+    /// Country database replacements that could not be opened (REQ-COLLECT-82NX).
+    pub country_db_reload_failures: AtomicU64,
 }
 
 impl Metrics {
@@ -51,6 +55,10 @@ impl Metrics {
                 v.load(Ordering::Relaxed)
             ));
         }
+        out.push_str(&format!(
+            "# TYPE kurzhaar_collector_country_db_reload_failures_total counter\nkurzhaar_collector_country_db_reload_failures_total {}\n",
+            self.country_db_reload_failures.load(Ordering::Relaxed)
+        ));
         out
     }
 }
@@ -71,6 +79,7 @@ pub struct AppState {
     pub trusted: Vec<IpNet>,
     pub queue: Arc<dyn Queue>,
     pub detector: Arc<dyn Detector>,
+    pub country: Arc<CountryDb>,
     pub limiter: RateLimiter,
     pub metrics: Arc<Metrics>,
     pub clock: Clock,
@@ -100,9 +109,29 @@ impl AppState {
             config,
             queue,
             detector,
+            country: Arc::new(CountryDb::disabled()),
             clock,
         })
     }
+
+    /// Uses this country database instead of none (REQ-COLLECT-82NX).
+    pub fn with_country(mut self, country: Arc<CountryDb>) -> AppState {
+        self.country = country;
+        self
+    }
+}
+
+/// Checks the country file once and counts a failed replacement; the caller runs this on a
+/// timer (REQ-COLLECT-82NX).
+pub fn refresh_country(db: &CountryDb, metrics: &Metrics) -> Reload {
+    let result = db.reload_if_changed();
+    if let Reload::Failed(reason) = &result {
+        metrics
+            .country_db_reload_failures
+            .fetch_add(1, Ordering::Relaxed);
+        tracing::error!(%reason, "country database not replaced, keeping the previous one");
+    }
+    result
 }
 
 /// The public listener: `/v1/collect`, `/healthz`, `/readyz`. `/metrics` is not here
@@ -208,8 +237,9 @@ async fn collect(State(s): State<Arc<AppState>>, req: Request<Body>) -> Response
 
     // The User-Agent and the signals are used here and dropped with the request (REQ-COLLECT-RA57).
     let detection = s.detector.detect(&signals::from_request(&batch, &headers));
+    let country = s.country.lookup(client);
     let token = envelope::token(&key, &body);
-    let message = envelope::build(batch, site, token, now, detection);
+    let message = envelope::build(batch, site, token, now, detection, country);
     let payload = match serde_json::to_vec(&message) {
         Ok(p) => p,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),

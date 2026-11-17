@@ -24,3 +24,11 @@ The system SHALL derive the country from an offline MMDB database file at a conf
 #### Scenario: City database {#S4}
 - **WHEN** the file is a city-level database
 - **THEN** only the country code is read
+
+#### Scenario: Address not in the database {#S5}
+- **WHEN** the client address has no entry in the database
+- **THEN** the event carries an empty country and the batch is accepted
+
+#### Scenario: Invalid replacement {#S6}
+- **WHEN** the file at the path is replaced with one that cannot be opened
+- **THEN** lookups keep using the previous database and the failure is logged and counted
