@@ -1,0 +1,375 @@
+{
+ "_comment": "Detection vectors: real User-Agents and client signals with the expected result. Run by the detector tests (ADR-1X7Z). Versions are major only.",
+ "vectors": [
+  {
+   "name": "Windows 10 Chrome with hints",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "brands": [
+     "Chromium/124",
+     "Google Chrome/124",
+     "Not-A.Brand/99"
+    ],
+    "mobile": false,
+    "platform": "Windows",
+    "platformMajor": 10,
+    "touchPoints": 0,
+    "coarsePointer": false
+   },
+   "expected": {
+    "browser": "Chrome",
+    "browserMajor": 124,
+    "os": "Windows",
+    "osMajor": 10,
+    "device": "desktop",
+    "bot": false
+   }
+  },
+  {
+   "name": "Windows 11 Chrome: platform version 13 and above",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "brands": [
+     "Chromium/124",
+     "Google Chrome/124",
+     "Not-A.Brand/99"
+    ],
+    "mobile": false,
+    "platform": "Windows",
+    "platformMajor": 15,
+    "touchPoints": 0,
+    "coarsePointer": false
+   },
+   "expected": {
+    "browser": "Chrome",
+    "browserMajor": 124,
+    "os": "Windows",
+    "osMajor": 11,
+    "device": "desktop",
+    "bot": false
+   }
+  },
+  {
+   "name": "Windows Chrome without hints says Windows 10",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+   },
+   "expected": {
+    "browser": "Chrome",
+    "browserMajor": 124,
+    "os": "Windows",
+    "osMajor": 10,
+    "device": "desktop",
+    "bot": false
+   }
+  },
+  {
+   "name": "Edge is named by its brand",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0",
+    "brands": [
+     "Chromium/124",
+     "Microsoft Edge/124",
+     "Not-A.Brand/99"
+    ],
+    "mobile": false,
+    "platform": "Windows",
+    "platformMajor": 10
+   },
+   "expected": {
+    "browser": "Edge",
+    "browserMajor": 124,
+    "os": "Windows",
+    "osMajor": 10,
+    "device": "desktop",
+    "bot": false
+   }
+  },
+  {
+   "name": "Firefox on Windows",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+    "touchPoints": 0
+   },
+   "expected": {
+    "browser": "Firefox",
+    "browserMajor": 125,
+    "os": "Windows",
+    "osMajor": 10,
+    "device": "desktop",
+    "bot": false
+   }
+  },
+  {
+   "name": "Safari on macOS",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+    "touchPoints": 0
+   },
+   "expected": {
+    "browser": "Safari",
+    "browserMajor": 17,
+    "os": "macOS",
+    "osMajor": null,
+    "device": "desktop",
+    "bot": false
+   }
+  },
+  {
+   "name": "Chrome on macOS with hints",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "brands": [
+     "Google Chrome/124"
+    ],
+    "mobile": false,
+    "platform": "macOS",
+    "platformMajor": 14,
+    "touchPoints": 0
+   },
+   "expected": {
+    "browser": "Chrome",
+    "browserMajor": 124,
+    "os": "macOS",
+    "osMajor": 14,
+    "device": "desktop",
+    "bot": false
+   }
+  },
+  {
+   "name": "iPad in desktop mode says Macintosh",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+    "touchPoints": 5,
+    "coarsePointer": true
+   },
+   "expected": {
+    "browser": "Safari",
+    "browserMajor": 17,
+    "os": "iOS",
+    "osMajor": 17,
+    "device": "tablet",
+    "bot": false
+   }
+  },
+  {
+   "name": "iPhone Safari",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+    "touchPoints": 5,
+    "coarsePointer": true
+   },
+   "expected": {
+    "browser": "Safari",
+    "browserMajor": 17,
+    "os": "iOS",
+    "osMajor": 17,
+    "device": "mobile",
+    "bot": false
+   }
+  },
+  {
+   "name": "iPad Safari",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+    "touchPoints": 5
+   },
+   "expected": {
+    "browser": "Safari",
+    "browserMajor": 17,
+    "os": "iOS",
+    "osMajor": 17,
+    "device": "tablet",
+    "bot": false
+   }
+  },
+  {
+   "name": "Android phone Chrome",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+    "brands": [
+     "Google Chrome/124"
+    ],
+    "mobile": true,
+    "platform": "Android",
+    "platformMajor": 14,
+    "touchPoints": 5,
+    "coarsePointer": true
+   },
+   "expected": {
+    "browser": "Chrome",
+    "browserMajor": 124,
+    "os": "Android",
+    "osMajor": 14,
+    "device": "mobile",
+    "bot": false
+   }
+  },
+  {
+   "name": "Android tablet Chrome has no Mobile token",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (Linux; Android 13; SM-X700) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "brands": [
+     "Google Chrome/124"
+    ],
+    "mobile": false,
+    "platform": "Android",
+    "platformMajor": 13,
+    "touchPoints": 5,
+    "coarsePointer": true
+   },
+   "expected": {
+    "browser": "Chrome",
+    "browserMajor": 124,
+    "os": "Android",
+    "osMajor": 13,
+    "device": "tablet",
+    "bot": false
+   }
+  },
+  {
+   "name": "Firefox on Android phone",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (Android 14; Mobile; rv:125.0) Gecko/125.0 Firefox/125.0",
+    "touchPoints": 5
+   },
+   "expected": {
+    "browser": "Firefox",
+    "browserMajor": 125,
+    "os": "Android",
+    "osMajor": 14,
+    "device": "mobile",
+    "bot": false
+   }
+  },
+  {
+   "name": "Samsung Internet",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (Linux; Android 14; SAMSUNG SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/24.0 Chrome/117.0.0.0 Mobile Safari/537.36",
+    "touchPoints": 5
+   },
+   "expected": {
+    "browser": "Samsung Internet",
+    "browserMajor": 24,
+    "os": "Android",
+    "osMajor": 14,
+    "device": "mobile",
+    "bot": false
+   }
+  },
+  {
+   "name": "Chrome on Linux",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "touchPoints": 0
+   },
+   "expected": {
+    "browser": "Chrome",
+    "browserMajor": 124,
+    "os": "Linux",
+    "osMajor": null,
+    "device": "desktop",
+    "bot": false
+   }
+  },
+  {
+   "name": "Smart TV is neither desktop nor mobile",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (SMART-TV; Linux; Tizen 7.0) AppleWebKit/537.36 (KHTML, like Gecko) 108.0.5359.1/7.0 TV Safari/537.36"
+   },
+   "expected": {
+    "browser": "Safari",
+    "browserMajor": null,
+    "os": "Tizen",
+    "osMajor": 7,
+    "device": "other",
+    "bot": false
+   }
+  },
+  {
+   "name": "Googlebot desktop",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+   },
+   "expected": {
+    "browser": "Googlebot",
+    "browserMajor": 2,
+    "os": "Other",
+    "osMajor": null,
+    "device": "desktop",
+    "bot": true
+   }
+  },
+  {
+   "name": "Googlebot smartphone",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+   },
+   "expected": {
+    "browser": "Googlebot",
+    "browserMajor": 2,
+    "os": "Android",
+    "osMajor": 6,
+    "device": "mobile",
+    "bot": true
+   }
+  },
+  {
+   "name": "Headless Chrome",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/124.0.0.0 Safari/537.36"
+   },
+   "expected": {
+    "browser": "HeadlessChrome",
+    "browserMajor": 124,
+    "os": "Linux",
+    "osMajor": null,
+    "device": "desktop",
+    "bot": true
+   }
+  },
+  {
+   "name": "curl",
+   "signals": {
+    "userAgent": "curl/8.4.0"
+   },
+   "expected": {
+    "browser": "curl",
+    "browserMajor": 8,
+    "os": "Other",
+    "osMajor": null,
+    "device": "desktop",
+    "bot": true
+   }
+  },
+  {
+   "name": "Empty User-Agent",
+   "signals": {
+    "userAgent": ""
+   },
+   "expected": {
+    "browser": "Other",
+    "browserMajor": null,
+    "os": "Other",
+    "osMajor": null,
+    "device": "desktop",
+    "bot": true
+   }
+  },
+  {
+   "name": "A phone called Cubot is not a bot",
+   "signals": {
+    "userAgent": "Mozilla/5.0 (Linux; Android 12; Cubot X30) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+    "touchPoints": 5
+   },
+   "expected": {
+    "browser": "Chrome",
+    "browserMajor": 124,
+    "os": "Android",
+    "osMajor": 12,
+    "device": "mobile",
+    "bot": false
+   }
+  }
+ ]
+}

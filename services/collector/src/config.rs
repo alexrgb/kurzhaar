@@ -27,6 +27,9 @@ pub struct Config {
     pub rate_limit_burst: u32,
     /// Upper bound of tracked addresses.
     pub rate_limit_max_entries: usize,
+    /// Detection results kept by the tuple of signals (REQ-COLLECT-4THR).
+    pub detector_cache_entries: usize,
+    pub detector_cache_seconds: u64,
     /// Sites known to this collector until the registry is read from Postgres.
     pub sites: Vec<Site>,
 }
@@ -42,6 +45,8 @@ impl Default for Config {
             rate_limit_per_minute: 300,
             rate_limit_burst: 60,
             rate_limit_max_entries: 100_000,
+            detector_cache_entries: 10_000,
+            detector_cache_seconds: 3600,
             sites: Vec::new(),
         }
     }
@@ -79,6 +84,12 @@ impl Config {
         if let Some(v) = get("RATE_LIMIT_BURST") {
             c.rate_limit_burst = number("RATE_LIMIT_BURST", &v)?;
         }
+        if let Some(v) = get("DETECTOR_CACHE_ENTRIES") {
+            c.detector_cache_entries = number("DETECTOR_CACHE_ENTRIES", &v)?;
+        }
+        if let Some(v) = get("DETECTOR_CACHE_SECONDS") {
+            c.detector_cache_seconds = number("DETECTOR_CACHE_SECONDS", &v)?;
+        }
         if let Some(v) = get("SITES") {
             c.sites = sites(&v)?;
         }
@@ -100,6 +111,11 @@ impl Config {
             ("rate_limit_per_minute", self.rate_limit_per_minute as usize),
             ("rate_limit_burst", self.rate_limit_burst as usize),
             ("rate_limit_max_entries", self.rate_limit_max_entries),
+            ("detector_cache_entries", self.detector_cache_entries),
+            (
+                "detector_cache_seconds",
+                self.detector_cache_seconds as usize,
+            ),
         ] {
             if value == 0 {
                 return Err(format!("{name} must be greater than zero"));

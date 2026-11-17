@@ -1,5 +1,6 @@
 use kurzhaar_collector::config::Config;
 use kurzhaar_collector::{metrics_router, public_router, system_clock, AppState};
+use kurzhaar_core::detect::{CachedDetector, UaparserDetector};
 use kurzhaar_queue::MemoryQueue;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -33,7 +34,20 @@ async fn main() {
     let metrics: SocketAddr = config.metrics_listen.parse().expect("validated");
     // The queue backends arrive with their own changes; until then batches stay in memory.
     tracing::warn!("using the in-memory queue: accepted batches are not delivered anywhere");
-    let state = match AppState::new(config, Arc::new(MemoryQueue::new()), system_clock()) {
+    let detector = match UaparserDetector::builtin() {
+        Ok(d) => CachedDetector::new(
+            d,
+            config.detector_cache_entries,
+            std::time::Duration::from_secs(config.detector_cache_seconds),
+        ),
+        Err(e) => fail(&e),
+    };
+    let state = match AppState::new(
+        config,
+        Arc::new(MemoryQueue::new()),
+        Arc::new(detector),
+        system_clock(),
+    ) {
         Ok(s) => Arc::new(s),
         Err(e) => fail(&e),
     };
