@@ -5,6 +5,7 @@ pub mod config;
 pub mod country;
 pub mod envelope;
 pub mod ratelimit;
+pub mod session;
 pub mod signals;
 
 use axum::body::{to_bytes, Body};
@@ -20,6 +21,7 @@ use ipnet::IpNet;
 use kurzhaar_core::detect::Detector;
 use kurzhaar_queue::Queue;
 use ratelimit::RateLimiter;
+use session::{MemorySalts, SaltSource};
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -80,6 +82,7 @@ pub struct AppState {
     pub queue: Arc<dyn Queue>,
     pub detector: Arc<dyn Detector>,
     pub country: Arc<CountryDb>,
+    pub salts: Arc<dyn SaltSource>,
     pub limiter: RateLimiter,
     pub metrics: Arc<Metrics>,
     pub clock: Clock,
@@ -110,8 +113,15 @@ impl AppState {
             queue,
             detector,
             country: Arc::new(CountryDb::disabled()),
+            salts: Arc::new(MemorySalts::new()),
             clock,
         })
+    }
+
+    /// Uses this salt source instead of random salts kept in memory (REQ-PRIVACY-E4TN).
+    pub fn with_salts(mut self, salts: Arc<dyn SaltSource>) -> AppState {
+        self.salts = salts;
+        self
     }
 
     /// Uses this country database instead of none (REQ-COLLECT-82NX).
@@ -239,13 +249,17 @@ async fn collect(State(s): State<Arc<AppState>>, req: Request<Body>) -> Response
     let detection = s.detector.detect(&signals::from_request(&batch, &headers));
     let country = s.country.lookup(client);
     let token = envelope::token(&key, &body);
-    let message = envelope::build(batch, site, token, now, detection, country);
+    let user_agent = headers
+        .get(header::USER_AGENT)
+        .map_or(&b""[..], |v| v.as_bytes());
+    let session = session::session_hash(&s.salts.salt(now), site, client, user_agent);
+    let message = envelope::build(batch, site, token, now, detection, country, session.clone());
     let payload = match serde_json::to_vec(&message) {
         Ok(p) => p,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
     // Acknowledge only after the queue has the batch (REQ-COLLECT-Y37S).
-    match s.queue.publish(site, payload).await {
+    match s.queue.publish(&session, payload).await {
         Ok(()) => {
             s.metrics.accepted.fetch_add(1, Ordering::Relaxed);
             StatusCode::ACCEPTED.into_response()
