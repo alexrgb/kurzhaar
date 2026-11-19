@@ -30,3 +30,7 @@ The system SHALL delete a session salt no later than ten minutes after the end o
 - **WHEN** a request arrives in the first second of a UTC day
 - **THEN** the day's salt exists and the request is not delayed or rejected
 
+#### Scenario: Cleanup job {#S6}
+- **WHEN** a salt is more than ten minutes past its day
+- **THEN** the admin backend overwrites its bytes, deletes the row and vacuums the table, and the table is unlogged so the salt is not in the write-ahead log
+

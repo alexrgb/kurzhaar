@@ -12,6 +12,7 @@ links:
     - REQ-PRIVACY-HNMK
   mitigated-by:
     - REQ-PRIVACY-E4TN
+    - REQ-COLLECT-8ERQ
 ---
 # RISK-FP70: Salt storage lets an operator link visitors across days
 
