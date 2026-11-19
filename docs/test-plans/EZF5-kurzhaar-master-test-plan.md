@@ -16,6 +16,9 @@ links:
     - REQ-AUTH-SBHM
     - REQ-AUTH-M491
     - REQ-COLLECT-C50Y
+    - REQ-RELEASE-KDXJ
+    - REQ-RELEASE-2JGH
+    - REQ-RELEASE-47NB
     - REQ-COLLECT-Y37S
     - REQ-COLLECT-FRDS
     - REQ-COLLECT-4VTR
@@ -109,6 +112,7 @@ Every requirement scenario must be verified by at least one automated test that 
 - Device detection: a vector set of real User-Agents and client signals (Windows 10 and 11, iPad in desktop mode, Android phone and tablet, Safari and Firefox without hints, bots) is run against the default detector and against any other implementation (REQ-COLLECT-X6WF), plus a check that queued events hold no raw signals (REQ-COLLECT-RA57).
 - Golden: the dataset in `contracts/golden` is loaded into the API and dashboard clusters and every shared metric must match expected values.
 - Collector: black-box tests of `POST /v1/collect` against a running collector with an in-memory queue: answers and limits, trusted proxy handling, CORS, the envelope contents (no address, User-Agent or Client Hints), the batch token, event dating with a skewed client clock, country lookup with a test MMDB file, rate limiting, readiness when the queue is down, and a scan of logs for addresses (REQ-COLLECT-GZF5).
+- Release: when the release workflow exists, a dry run checks that every image carries the platform tag, that the notes hold the compatibility table and the "Operator action" heading, and that an older tracker's batches are still accepted (REQ-RELEASE-KDXJ, REQ-RELEASE-2JGH, REQ-RELEASE-47NB). Until then these requirements stay unverified by design.
 - Integration: collector, queue, consumers and ClickHouse in Docker, including redelivery and queue outage cases, for each supported queue.
 - Language: `pnpm typecheck` runs strict TypeScript checks in every package, and a CI step fails when a `.js`, `.mjs`, `.cjs` or `.jsx` source file is tracked (REQ-TRACKER-2D61).
 - Contract: each service is checked against its OpenAPI document.
