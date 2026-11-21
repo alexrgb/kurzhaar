@@ -46,6 +46,28 @@ The collector derives the visitor's country from an MMDB file that you provide; 
 
 The collector checks the file once a minute and starts using a replaced file without a restart. If the replacement cannot be opened, the previous database stays in use and `kurzhaar_collector_country_db_reload_failures_total` rises. A path that cannot be opened at start stops the collector. Replace the file by writing it under another name and renaming it over the old one.
 
+## Collector and Postgres
+
+With `KURZHAAR_COLLECTOR_POSTGRES_URL` set, the collector reads its sites and daily salts from Postgres instead of the fixed `sites` list and in-memory salts. Several collectors then share sessions. The admin backend owns the tables; the collector reads two views and writes nothing:
+
+- `collector_site_keys (key text, site_id text)`: one row per key of every enabled site.
+- `collector_salts (day date, salt bytea)`: the salts of the current and the next UTC day, 32 bytes each.
+
+Create a role that can only read them, and nothing else (the collector refuses to start with a role that can write, create objects or is a superuser):
+
+```sql
+CREATE ROLE kurzhaar_collector LOGIN PASSWORD '...';
+GRANT CONNECT ON DATABASE kurzhaar TO kurzhaar_collector;
+GRANT USAGE ON SCHEMA public TO kurzhaar_collector;
+GRANT SELECT ON collector_site_keys, collector_salts TO kurzhaar_collector;
+```
+
+The connection string is read from the environment only. Settings: `KURZHAAR_COLLECTOR_POSTGRES_TLS` (`true` verifies the server against the system's certificate roots), `KURZHAAR_COLLECTOR_REGISTRY_REFRESH_SECONDS` (default 60, at most 60) and `KURZHAAR_COLLECTOR_REGISTRY_GRACE_SECONDS` (default 3600). The admin backend sends `NOTIFY kurzhaar_sites` after a site or key changes, so a change takes effect within seconds; without it, within the refresh interval.
+
+If Postgres is unreachable, the collector keeps accepting batches from the last registry it loaded. `/readyz` turns red once that registry is older than the grace period, and the collector still answers from it. A collector that has never reached Postgres answers `503` with `Retry-After`, so trackers retry instead of losing events. If today's salt is missing, the collector uses a random one in memory and counts `kurzhaar_collector_salt_fallback_total`; sessions then differ between replicas for that day.
+
+Salts are session secrets for one day. Keep the salt table out of database dumps (for example `pg_dump --exclude-table-data=session_salts`) and do not copy the data directory of a running server to long-term storage; the software cannot remove salts from backups you keep.
+
 ## Ports
 
 All ports bind to `127.0.0.1` by default. Set `BIND_ADDRESS=0.0.0.0` only behind a firewall.

@@ -4,7 +4,9 @@ pub mod clientip;
 pub mod config;
 pub mod country;
 pub mod envelope;
+pub mod postgres;
 pub mod ratelimit;
+pub mod registry;
 pub mod session;
 pub mod signals;
 
@@ -21,8 +23,8 @@ use ipnet::IpNet;
 use kurzhaar_core::detect::Detector;
 use kurzhaar_queue::Queue;
 use ratelimit::RateLimiter;
+use registry::{Lookup, Registry};
 use session::{MemorySalts, SaltSource};
-use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -38,6 +40,13 @@ pub struct Metrics {
     pub queue_errors: AtomicU64,
     /// Country database replacements that could not be opened (REQ-COLLECT-82NX).
     pub country_db_reload_failures: AtomicU64,
+    /// Batches answered 503 because no registry snapshot exists (REQ-COLLECT-THCX).
+    pub registry_unavailable: AtomicU64,
+    /// Registry loads from Postgres, failed ones and successful ones.
+    pub registry_loads: AtomicU64,
+    pub registry_load_failures: AtomicU64,
+    /// Days for which no Postgres salt was found and a random one was made (REQ-COLLECT-8ERQ).
+    pub salt_fallbacks: Arc<AtomicU64>,
 }
 
 impl Metrics {
@@ -54,6 +63,17 @@ impl Metrics {
         for (name, v) in rows {
             out.push_str(&format!(
                 "# TYPE kurzhaar_collector_batches_{name}_total counter\nkurzhaar_collector_batches_{name}_total {}\n",
+                v.load(Ordering::Relaxed)
+            ));
+        }
+        for (name, v) in [
+            ("registry_unavailable_batches", &self.registry_unavailable),
+            ("registry_loads", &self.registry_loads),
+            ("registry_load_failures", &self.registry_load_failures),
+            ("salt_fallback", &*self.salt_fallbacks),
+        ] {
+            out.push_str(&format!(
+                "# TYPE kurzhaar_collector_{name}_total counter\nkurzhaar_collector_{name}_total {}\n",
                 v.load(Ordering::Relaxed)
             ));
         }
@@ -77,7 +97,7 @@ pub fn system_clock() -> Clock {
 
 pub struct AppState {
     pub config: Config,
-    pub sites: HashMap<String, String>,
+    pub registry: Arc<Registry>,
     pub trusted: Vec<IpNet>,
     pub queue: Arc<dyn Queue>,
     pub detector: Arc<dyn Detector>,
@@ -97,11 +117,13 @@ impl AppState {
     ) -> Result<AppState, String> {
         config.validate()?;
         Ok(AppState {
-            sites: config
-                .sites
-                .iter()
-                .map(|s| (s.key.clone(), s.id.clone()))
-                .collect(),
+            registry: Arc::new(Registry::fixed(
+                config
+                    .sites
+                    .iter()
+                    .map(|s| (s.key.clone(), s.id.clone()))
+                    .collect(),
+            )),
             trusted: config.trusted()?,
             limiter: RateLimiter::new(
                 config.rate_limit_per_minute,
@@ -116,6 +138,12 @@ impl AppState {
             salts: Arc::new(MemorySalts::new()),
             clock,
         })
+    }
+
+    /// Uses this registry instead of the fixed list from the configuration (ADR-DW71).
+    pub fn with_registry(mut self, registry: Arc<Registry>) -> AppState {
+        self.registry = registry;
+        self
     }
 
     /// Uses this salt source instead of random salts kept in memory (REQ-PRIVACY-E4TN).
@@ -187,9 +215,11 @@ async fn preflight() -> Response {
 
 // spec: REQ-COLLECT-X2K2
 async fn ready(State(s): State<Arc<AppState>>) -> StatusCode {
+    // The queue must answer, and the site registry must be loaded and within its grace period.
+    // A stale registry is still used for lookups; only readiness is withdrawn (REQ-COLLECT-THCX).
     match s.queue.ping().await {
-        Ok(()) => StatusCode::OK,
-        Err(_) => StatusCode::SERVICE_UNAVAILABLE,
+        Ok(()) if s.registry.is_fresh((s.clock)()) => StatusCode::OK,
+        _ => StatusCode::SERVICE_UNAVAILABLE,
     }
 }
 
@@ -240,10 +270,22 @@ async fn collect(State(s): State<Arc<AppState>>, req: Request<Body>) -> Response
     // An unknown or disabled site is answered like an accepted batch, so the answer never
     // reveals which keys exist (REQ-COLLECT-4VTR).
     let key = batch.key.clone().unwrap_or_default();
-    let Some(site) = s.sites.get(&key) else {
-        s.metrics.dropped.fetch_add(1, Ordering::Relaxed);
-        return StatusCode::ACCEPTED.into_response();
+    let site = match s.registry.lookup(&key) {
+        Lookup::Site(site) => site,
+        Lookup::Unknown => {
+            s.metrics.dropped.fetch_add(1, Ordering::Relaxed);
+            return StatusCode::ACCEPTED.into_response();
+        }
+        // Nothing is known yet: ask the tracker to retry instead of losing the batch
+        // (REQ-COLLECT-THCX).
+        Lookup::Unavailable => {
+            s.metrics
+                .registry_unavailable
+                .fetch_add(1, Ordering::Relaxed);
+            return retry_after(StatusCode::SERVICE_UNAVAILABLE, 5);
+        }
     };
+    let site = site.as_str();
 
     // The User-Agent and the signals are used here and dropped with the request (REQ-COLLECT-RA57).
     let detection = s.detector.detect(&signals::from_request(&batch, &headers));

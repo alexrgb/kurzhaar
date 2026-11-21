@@ -5,6 +5,27 @@ use ipnet::IpNet;
 use serde::Deserialize;
 use std::net::SocketAddr;
 
+/// A value that must not appear in logs or debug output.
+#[derive(Clone, Deserialize, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct Secret(String);
+
+impl Secret {
+    pub fn new(value: impl Into<String>) -> Secret {
+        Secret(value.into())
+    }
+
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for Secret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("<hidden>")
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Site {
     pub key: String,
@@ -32,6 +53,15 @@ pub struct Config {
     pub detector_cache_seconds: u64,
     /// MMDB country database; unset means events carry no country (REQ-COLLECT-82NX).
     pub country_db: Option<String>,
+    /// Postgres connection string for the site registry and salts. Environment only
+    /// (REQ-COLLECT-Y61T); without it the fixed `sites` list and in-memory salts are used.
+    pub postgres_url: Option<Secret>,
+    /// Connect to Postgres over TLS, verifying the server against the system's roots.
+    pub postgres_tls: bool,
+    /// Seconds between registry and salt reloads, at most 60 (REQ-COLLECT-EWYP).
+    pub registry_refresh_seconds: u64,
+    /// Seconds a registry snapshot counts as fresh after its last load (REQ-COLLECT-THCX).
+    pub registry_grace_seconds: u64,
     /// Sites known to this collector until the registry is read from Postgres.
     pub sites: Vec<Site>,
 }
@@ -50,6 +80,10 @@ impl Default for Config {
             detector_cache_entries: 10_000,
             detector_cache_seconds: 3600,
             country_db: None,
+            postgres_url: None,
+            postgres_tls: false,
+            registry_refresh_seconds: 60,
+            registry_grace_seconds: 3600,
             sites: Vec::new(),
         }
     }
@@ -65,6 +99,9 @@ impl Config {
             Some(text) => toml::from_str(text).map_err(|e| format!("config file: {e}"))?,
             None => Config::default(),
         };
+        if c.postgres_url.is_some() {
+            return Err("postgres_url is set in the config file; put it in KURZHAAR_COLLECTOR_POSTGRES_URL so the password stays out of files".into());
+        }
         let get = |k: &str| env(&format!("KURZHAAR_COLLECTOR_{k}"));
         if let Some(v) = get("LISTEN") {
             c.listen = v;
@@ -96,6 +133,18 @@ impl Config {
         if let Some(v) = get("COUNTRY_DB") {
             c.country_db = Some(v).filter(|v| !v.is_empty());
         }
+        if let Some(v) = get("POSTGRES_URL") {
+            c.postgres_url = Some(Secret(v)).filter(|v| !v.0.is_empty());
+        }
+        if let Some(v) = get("POSTGRES_TLS") {
+            c.postgres_tls = matches!(v.as_str(), "1" | "true" | "yes" | "on");
+        }
+        if let Some(v) = get("REGISTRY_REFRESH_SECONDS") {
+            c.registry_refresh_seconds = number("REGISTRY_REFRESH_SECONDS", &v)?;
+        }
+        if let Some(v) = get("REGISTRY_GRACE_SECONDS") {
+            c.registry_grace_seconds = number("REGISTRY_GRACE_SECONDS", &v)?;
+        }
         if let Some(v) = get("SITES") {
             c.sites = sites(&v)?;
         }
@@ -111,6 +160,12 @@ impl Config {
             .parse::<SocketAddr>()
             .map_err(|e| format!("metrics_listen `{}`: {e}", self.metrics_listen))?;
         self.trusted()?;
+        if !(1..=60).contains(&self.registry_refresh_seconds) {
+            return Err("registry_refresh_seconds must be between 1 and 60".into());
+        }
+        if self.registry_grace_seconds == 0 {
+            return Err("registry_grace_seconds must be greater than zero".into());
+        }
         for (name, value) in [
             ("max_body_bytes", self.max_body_bytes),
             ("max_events_per_batch", self.max_events_per_batch),
