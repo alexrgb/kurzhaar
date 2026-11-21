@@ -16,6 +16,10 @@ links:
     - REQ-AUTH-SBHM
     - REQ-AUTH-M491
     - REQ-COLLECT-C50Y
+    - REQ-COLLECT-EWYP
+    - REQ-COLLECT-THCX
+    - REQ-COLLECT-Y61T
+    - REQ-COLLECT-8ERQ
     - REQ-RELEASE-KDXJ
     - REQ-RELEASE-2JGH
     - REQ-RELEASE-47NB
@@ -113,6 +117,7 @@ Every requirement scenario must be verified by at least one automated test that 
 - Golden: the dataset in `contracts/golden` is loaded into the API and dashboard clusters and every shared metric must match expected values.
 - Collector: black-box tests of `POST /v1/collect` against a running collector with an in-memory queue: answers and limits, trusted proxy handling, CORS, the envelope contents (no address, User-Agent or Client Hints), the batch token, event dating with a skewed client clock, country lookup with a test MMDB file, rate limiting, readiness when the queue is down, and a scan of logs for addresses (REQ-COLLECT-GZF5).
 - Release: when the release workflow exists, a dry run checks that every image carries the platform tag, that the notes hold the compatibility table and the "Operator action" heading, and that an older tracker's batches are still accepted (REQ-RELEASE-KDXJ, REQ-RELEASE-2JGH, REQ-RELEASE-47NB). Until then these requirements stay unverified by design.
+- Registry and salts: the collector against a real Postgres in CI with the two views, a read-only role and a write-capable one; outage, restart without Postgres, notification and polling reloads, two collectors sharing salts, and a statement log that shows only reads (REQ-COLLECT-EWYP, REQ-COLLECT-THCX, REQ-COLLECT-Y61T, REQ-COLLECT-8ERQ).
 - Integration: collector, queue, consumers and ClickHouse in Docker, including redelivery and queue outage cases, for each supported queue.
 - Language: `pnpm typecheck` runs strict TypeScript checks in every package, and a CI step fails when a `.js`, `.mjs`, `.cjs` or `.jsx` source file is tracked (REQ-TRACKER-2D61).
 - Contract: each service is checked against its OpenAPI document.
