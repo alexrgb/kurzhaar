@@ -43,9 +43,11 @@ async fn main() {
         ),
         Err(e) => fail(&e),
     };
-    tracing::warn!(
-        "salts are kept in memory: sessions are not shared between replicas and restart with the process"
-    );
+    if config.postgres_url.is_none() {
+        tracing::warn!(
+            "salts are kept in memory: sessions are not shared between replicas and restart with the process"
+        );
+    }
     let country = match &config.country_db {
         Some(path) => match CountryDb::open(path) {
             Ok(db) => Arc::new(db),
@@ -56,6 +58,16 @@ async fn main() {
             Arc::new(CountryDb::disabled())
         }
     };
+    let postgres = config.postgres_url.clone().map(|url| {
+        (
+            kurzhaar_collector::postgres::Settings {
+                url,
+                tls: config.postgres_tls,
+                refresh: std::time::Duration::from_secs(config.registry_refresh_seconds),
+            },
+            config.registry_grace_seconds,
+        )
+    });
     let state = match AppState::new(
         config,
         Arc::new(MemoryQueue::new()),
@@ -64,6 +76,30 @@ async fn main() {
     ) {
         Ok(s) => Arc::new(s.with_country(country.clone())),
         Err(e) => fail(&e),
+    };
+    let state = match postgres {
+        Some((settings, grace)) => {
+            let registry = Arc::new(
+                kurzhaar_collector::registry::Registry::loaded_from_postgres(grace * 1000),
+            );
+            let salts = Arc::new(kurzhaar_collector::session::PgSalts::new(
+                state.metrics.salt_fallbacks.clone(),
+            ));
+            let targets = kurzhaar_collector::postgres::Targets {
+                registry: registry.clone(),
+                salts: salts.clone(),
+                metrics: state.metrics.clone(),
+                clock: system_clock(),
+            };
+            if let Err(e) = kurzhaar_collector::postgres::start(settings, targets).await {
+                fail(&format!("postgres: {e}"));
+            }
+            let mut state = Arc::into_inner(state).expect("state is not shared yet");
+            state.registry = registry;
+            state.salts = salts;
+            Arc::new(state)
+        }
+        None => state,
     };
     if country.is_enabled() {
         let metrics = state.metrics.clone();
