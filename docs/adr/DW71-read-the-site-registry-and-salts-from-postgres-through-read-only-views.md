@@ -1,7 +1,7 @@
 ---
 id: ADR-DW71
 type: adr
-status: proposed
+status: accepted
 links:
   refines:
     - ADR-K8N9
