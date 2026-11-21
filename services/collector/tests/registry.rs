@@ -198,7 +198,12 @@ fn rig(grace_seconds: u64) -> Rig {
     };
     let queue = Arc::new(MemoryQueue::new());
     let state = AppState::new(
-        Config::default(),
+        Config {
+            // The clock stands still, so a low limit would never refill during a long test.
+            rate_limit_per_minute: 1_000_000,
+            rate_limit_burst: 1_000_000,
+            ..Config::default()
+        },
         queue.clone(),
         Arc::new(Nothing),
         clock.clone(),
