@@ -6,7 +6,8 @@ use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use std::collections::BTreeMap;
 use std::net::IpAddr;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use zeroize::Zeroizing;
 
 const DAY_MS: u64 = 86_400_000;
@@ -73,4 +74,66 @@ pub fn session_hash(salt: &Salt, site: &str, address: IpAddr, user_agent: &[u8])
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect()
+}
+
+/// Salts read from Postgres, with a random in-memory salt for a day that has none
+/// (REQ-COLLECT-8ERQ, ADR-DW71).
+pub struct PgSalts {
+    loaded: Mutex<BTreeMap<u64, Salt>>,
+    fallback: MemorySalts,
+    /// Counts days that had to use the fallback.
+    fallbacks: Arc<AtomicU64>,
+    /// The last day the fallback was reported for, so it is logged and counted once a day.
+    reported_day: AtomicU64,
+}
+
+impl PgSalts {
+    pub fn new(fallbacks: Arc<AtomicU64>) -> PgSalts {
+        PgSalts {
+            loaded: Mutex::new(BTreeMap::new()),
+            fallback: MemorySalts::new(),
+            fallbacks,
+            reported_day: AtomicU64::new(u64::MAX),
+        }
+    }
+
+    /// Replaces the held salts with what Postgres has now; a salt that is gone there is
+    /// wiped here.
+    pub fn replace(&self, salts: Vec<(u64, Salt)>, now_ms: u64) {
+        let mut loaded = self.loaded.lock().expect("salts");
+        *loaded = salts.into_iter().collect();
+        loaded.retain(|day, _| (day + 1) * DAY_MS + GRACE_MS > now_ms);
+    }
+
+    /// Drops salts that are more than ten minutes past their day.
+    pub fn prune(&self, now_ms: u64) {
+        let mut loaded = self.loaded.lock().expect("salts");
+        loaded.retain(|day, _| (day + 1) * DAY_MS + GRACE_MS > now_ms);
+    }
+
+    /// The UTC days whose Postgres salt is held now, for tests.
+    pub fn held_days(&self) -> Vec<u64> {
+        self.loaded.lock().expect("salts").keys().copied().collect()
+    }
+}
+
+impl SaltSource for PgSalts {
+    fn salt(&self, now_ms: u64) -> Salt {
+        let day = now_ms / DAY_MS;
+        {
+            let mut loaded = self.loaded.lock().expect("salts");
+            loaded.retain(|d, _| (d + 1) * DAY_MS + GRACE_MS > now_ms);
+            if let Some(salt) = loaded.get(&day) {
+                return salt.clone();
+            }
+        }
+        if self.reported_day.swap(day, Ordering::Relaxed) != day {
+            self.fallbacks.fetch_add(1, Ordering::Relaxed);
+            tracing::warn!(
+                day,
+                "no salt in Postgres for today, using a random one in memory"
+            );
+        }
+        self.fallback.salt(now_ms)
+    }
 }
