@@ -1,7 +1,7 @@
 ---
 id: ADR-9FWC
 type: adr
-status: proposed
+status: accepted
 links:
   refines:
     - ADR-GTN9
