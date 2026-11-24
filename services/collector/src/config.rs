@@ -53,6 +53,14 @@ pub struct Config {
     pub detector_cache_seconds: u64,
     /// MMDB country database; unset means events carry no country (REQ-COLLECT-82NX).
     pub country_db: Option<String>,
+    /// Queue backend: `memory` or `redis` (REQ-QUEUE-BMGT).
+    pub queue: String,
+    /// Connection string of the queue. Environment only (REQ-QUEUE-754R).
+    pub queue_url: Option<Secret>,
+    /// Number of stream shards (REQ-QUEUE-1PF3).
+    pub queue_shards: u32,
+    /// Prefix of the stream names.
+    pub queue_stream_prefix: String,
     /// Postgres connection string for the site registry and salts. Environment only
     /// (REQ-COLLECT-Y61T); without it the fixed `sites` list and in-memory salts are used.
     pub postgres_url: Option<Secret>,
@@ -80,6 +88,10 @@ impl Default for Config {
             detector_cache_entries: 10_000,
             detector_cache_seconds: 3600,
             country_db: None,
+            queue: "memory".into(),
+            queue_url: None,
+            queue_shards: 1,
+            queue_stream_prefix: "kurzhaar:events".into(),
             postgres_url: None,
             postgres_tls: false,
             registry_refresh_seconds: 60,
@@ -101,6 +113,9 @@ impl Config {
         };
         if c.postgres_url.is_some() {
             return Err("postgres_url is set in the config file; put it in KURZHAAR_COLLECTOR_POSTGRES_URL so the password stays out of files".into());
+        }
+        if c.queue_url.is_some() {
+            return Err("queue_url is set in the config file; put it in KURZHAAR_COLLECTOR_QUEUE_URL so the password stays out of files".into());
         }
         let get = |k: &str| env(&format!("KURZHAAR_COLLECTOR_{k}"));
         if let Some(v) = get("LISTEN") {
@@ -133,6 +148,18 @@ impl Config {
         if let Some(v) = get("COUNTRY_DB") {
             c.country_db = Some(v).filter(|v| !v.is_empty());
         }
+        if let Some(v) = get("QUEUE") {
+            c.queue = v;
+        }
+        if let Some(v) = get("QUEUE_URL") {
+            c.queue_url = Some(Secret(v)).filter(|v| !v.0.is_empty());
+        }
+        if let Some(v) = get("QUEUE_SHARDS") {
+            c.queue_shards = number("QUEUE_SHARDS", &v)?;
+        }
+        if let Some(v) = get("QUEUE_STREAM_PREFIX") {
+            c.queue_stream_prefix = v;
+        }
         if let Some(v) = get("POSTGRES_URL") {
             c.postgres_url = Some(Secret(v)).filter(|v| !v.0.is_empty());
         }
@@ -160,6 +187,25 @@ impl Config {
             .parse::<SocketAddr>()
             .map_err(|e| format!("metrics_listen `{}`: {e}", self.metrics_listen))?;
         self.trusted()?;
+        match self.queue.as_str() {
+            "memory" => {}
+            "redis" => {
+                if self.queue_url.is_none() {
+                    return Err("queue `redis` needs KURZHAAR_COLLECTOR_QUEUE_URL".into());
+                }
+            }
+            other => {
+                return Err(format!(
+                    "unknown queue `{other}`; known names: memory, redis"
+                ))
+            }
+        }
+        if !(1..=64).contains(&self.queue_shards) {
+            return Err("queue_shards must be between 1 and 64".into());
+        }
+        if self.queue_stream_prefix.is_empty() {
+            return Err("queue_stream_prefix must not be empty".into());
+        }
         if !(1..=60).contains(&self.registry_refresh_seconds) {
             return Err("registry_refresh_seconds must be between 1 and 60".into());
         }
