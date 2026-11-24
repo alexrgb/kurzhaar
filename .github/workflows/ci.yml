@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  OXISPEC_VERSION: 0.1.0-rc.5
+  OXISPEC_VERSION: 0.1.0-rc.8
 
 jobs:
   specs:
@@ -21,6 +21,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # `oxispec ci` compares with the branch point on main.
+          fetch-depth: 0
       - name: Install oxispec
         run: |
           base="https://github.com/alexrgb/oxispec/releases/download/v${OXISPEC_VERSION}"
@@ -31,7 +34,16 @@ jobs:
           mkdir -p "$HOME/oxispec"
           tar -xJf "$file" -C "$HOME/oxispec" --strip-components=1
           echo "$HOME/oxispec" >> "$GITHUB_PATH"
-      - run: oxispec check
+      - run: oxispec check --strict
+      - name: Findings this pull request introduces
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags origin main
+          oxispec ci --strict --base origin/main --markdown "$RUNNER_TEMP/oxispec.md" || status=$?
+          cat "$RUNNER_TEMP/oxispec.md" >> "$GITHUB_STEP_SUMMARY"
+          exit "${status:-0}"
+      - name: Scenarios no test verifies (report, not a gate)
+        run: oxispec test-plan >> "$GITHUB_STEP_SUMMARY" || true
 
   js:
     name: JavaScript (build and test)
