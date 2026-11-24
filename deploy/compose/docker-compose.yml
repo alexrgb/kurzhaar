@@ -124,6 +124,10 @@ services:
       - redis-server
       - --appendonly
       - "yes"
+      # A crash can lose about the last second of acknowledged writes. Use "always" to trade
+      # throughput for none (ADR-9FWC).
+      - --appendfsync
+      - everysec
       - --maxmemory
       - ${REDIS_MAXMEMORY:-512mb}
       - --maxmemory-policy

@@ -46,6 +46,20 @@ The collector derives the visitor's country from an MMDB file that you provide; 
 
 The collector checks the file once a minute and starts using a replaced file without a restart. If the replacement cannot be opened, the previous database stays in use and `kurzhaar_collector_country_db_reload_failures_total` rises. A path that cannot be opened at start stops the collector. Replace the file by writing it under another name and renaming it over the old one.
 
+## Queue: Redis Streams
+
+Set `KURZHAAR_COLLECTOR_QUEUE=redis` and `KURZHAAR_COLLECTOR_QUEUE_URL` (for example `redis://collector:PASSWORD@redis:6379`; `rediss://` turns on TLS with the server certificate verified; the URL is read from the environment only). Messages go to `kurzhaar:events:<shard>`; `KURZHAAR_COLLECTOR_QUEUE_SHARDS` (default 1, at most 64) spreads sessions over several streams and `KURZHAAR_COLLECTOR_QUEUE_STREAM_PREFIX` renames them. Change the shard count only after the consumers have drained the streams. Redis Cluster is not supported.
+
+The collector answers a batch only after Redis has stored it. If Redis is unreachable, slower than two seconds or full, the answer is `503` with `Retry-After` and the tracker retries. Redis is started with AOF `appendfsync everysec`, so a crash can lose about the last second of acknowledged messages; set `always` if that is not acceptable, at the cost of speed.
+
+The collector never trims a stream, and the `noeviction` policy makes a full Redis refuse writes instead of dropping messages. **The consumers' retention job is not implemented yet**, so until the consumer exists, streams only grow, and a Redis that is only fed by the collector fills up to `maxmemory` and then refuses batches. Watch its memory.
+
+An account for the collector needs only two commands on the event streams:
+
+```
+ACL SETUSER collector on >PASSWORD ~kurzhaar:events:* -@all +xadd +ping
+```
+
 ## Collector and Postgres
 
 With `KURZHAAR_COLLECTOR_POSTGRES_URL` set, the collector reads its sites and daily salts from Postgres instead of the fixed `sites` list and in-memory salts. Several collectors then share sessions. The admin backend owns the tables; the collector reads two views and writes nothing:

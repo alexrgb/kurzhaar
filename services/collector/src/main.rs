@@ -33,8 +33,22 @@ async fn main() {
 
     let public: SocketAddr = config.listen.parse().expect("validated");
     let metrics: SocketAddr = config.metrics_listen.parse().expect("validated");
-    // The queue backends arrive with their own changes; until then batches stay in memory.
-    tracing::warn!("using the in-memory queue: accepted batches are not delivered anywhere");
+    let queue: Arc<dyn kurzhaar_queue::Queue> = match (config.queue.as_str(), &config.queue_url) {
+        ("redis", Some(url)) => match kurzhaar_queue::redis::RedisQueue::new(
+            url.expose(),
+            &config.queue_stream_prefix,
+            config.queue_shards,
+        ) {
+            Ok(q) => Arc::new(q),
+            Err(e) => fail(&e.to_string()),
+        },
+        _ => {
+            tracing::warn!(
+                "using the in-memory queue: accepted batches are not delivered anywhere"
+            );
+            Arc::new(MemoryQueue::new())
+        }
+    };
     let detector = match UaparserDetector::builtin() {
         Ok(d) => CachedDetector::new(
             d,
@@ -68,12 +82,7 @@ async fn main() {
             config.registry_grace_seconds,
         )
     });
-    let state = match AppState::new(
-        config,
-        Arc::new(MemoryQueue::new()),
-        Arc::new(detector),
-        system_clock(),
-    ) {
+    let state = match AppState::new(config, queue, Arc::new(detector), system_clock()) {
         Ok(s) => Arc::new(s.with_country(country.clone())),
         Err(e) => fail(&e),
     };

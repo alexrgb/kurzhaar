@@ -3,6 +3,8 @@
 //! The trait moves opaque bytes and a partition key; the envelope that goes through it belongs to
 //! the collector (ADR-K8N9).
 
+pub mod redis;
+
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
