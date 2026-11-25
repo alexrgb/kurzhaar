@@ -7,7 +7,7 @@ links:
     - ADR-HB8W
 ---
 ### Requirement: Expose lag and readiness per sink
-The system SHALL serve `/healthz`, `/readyz` and `/metrics` on a listener of its own, report lag, pending, inserted and dead-lettered counts per sink, and be not ready while the queue or ClickHouse cannot be reached.
+The system SHALL serve `/healthz`, `/readyz` and `/metrics` on a listener of its own, report lag, the age of the oldest pending message, pending, inserted and dead-lettered counts per sink, and be not ready while the queue or ClickHouse cannot be reached.
 
 #### Scenario: Metrics {#S1}
 - **WHEN** the metrics are read
@@ -24,3 +24,8 @@ The system SHALL serve `/healthz`, `/readyz` and `/metrics` on a listener of its
 #### Scenario: Not public {#S4}
 - **WHEN** the public listener is scanned
 - **THEN** it does not serve `/metrics`
+
+#### Scenario: Age of the backlog {#S5}
+- **WHEN** messages have been pending for some time
+- **THEN** the metrics show the age of the oldest pending message of the sink, so a stuck sink can be alerted on
+

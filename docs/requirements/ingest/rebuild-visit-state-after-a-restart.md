@@ -7,7 +7,7 @@ links:
     - ADR-HB8W
 ---
 ### Requirement: Rebuild visit state after a restart
-The system SHALL assign visit ids in the order of each session, rebuild the state of the last 30 minutes from the sink's own cluster at start, and give the same visit to a redelivered event that is earlier than the last event of its session.
+The system SHALL assign visit ids in the order of each session, rebuild the state of the 30 minutes before the newest event in the sink's own cluster at start, and give the same visit to a redelivered event that is earlier than the last event of its session.
 
 #### Scenario: In order {#S1}
 - **WHEN** events of one session arrive within 30 minutes of each other
@@ -28,3 +28,8 @@ The system SHALL assign visit ids in the order of each session, rebuild the stat
 #### Scenario: Salt rotation {#S5}
 - **WHEN** the session hash changes at a salt rotation
 - **THEN** the next event starts a new visit
+
+#### Scenario: After a long outage {#S6}
+- **WHEN** the consumer restarts hours after the newest event stored in its cluster
+- **THEN** the state is rebuilt from the 30 minutes before that event, so a session that was active just before the outage can continue its visit
+
