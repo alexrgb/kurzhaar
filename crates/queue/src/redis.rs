@@ -11,6 +11,11 @@ use tokio::sync::OnceCell;
 pub const WRITE_TIMEOUT: Duration = Duration::from_secs(2);
 const PING_TIMEOUT: Duration = Duration::from_secs(1);
 
+/// The name of one shard's stream.
+pub fn stream_name(prefix: &str, shard: u32) -> String {
+    format!("{prefix}:{shard}")
+}
+
 pub struct RedisQueue {
     client: redis::Client,
     prefix: String,
@@ -42,7 +47,7 @@ impl RedisQueue {
     pub fn stream_for(&self, partition_key: &str) -> String {
         let hash = blake3::hash(partition_key.as_bytes());
         let n = u32::from_le_bytes(hash.as_bytes()[..4].try_into().expect("four bytes"));
-        format!("{}:{}", self.prefix, n % self.shards)
+        stream_name(&self.prefix, n % self.shards)
     }
 
     async fn connection(&self) -> Result<ConnectionManager, QueueError> {
