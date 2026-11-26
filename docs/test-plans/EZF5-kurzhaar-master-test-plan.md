@@ -16,6 +16,12 @@ links:
     - REQ-AUTH-SBHM
     - REQ-AUTH-M491
     - REQ-COLLECT-C50Y
+    - REQ-INGEST-J5R5
+    - REQ-INGEST-C5GW
+    - REQ-INGEST-XS9C
+    - REQ-INGEST-2FH3
+    - REQ-INGEST-45RE
+    - REQ-INGEST-DX9Z
     - REQ-QUEUE-GE19
     - REQ-QUEUE-1PF3
     - REQ-QUEUE-YATM
@@ -124,6 +130,7 @@ Every requirement scenario must be verified by at least one automated test that 
 - Release: when the release workflow exists, a dry run checks that every image carries the platform tag, that the notes hold the compatibility table and the "Operator action" heading, and that an older tracker's batches are still accepted (REQ-RELEASE-KDXJ, REQ-RELEASE-2JGH, REQ-RELEASE-47NB). Until then these requirements stay unverified by design.
 - Registry and salts: the collector against a real Postgres in CI with the two views, a read-only role and a write-capable one; outage, restart without Postgres, notification and polling reloads, two collectors sharing salts, and a statement log that shows only reads (REQ-COLLECT-EWYP, REQ-COLLECT-THCX, REQ-COLLECT-Y61T, REQ-COLLECT-8ERQ).
 - Queue (Redis): the Redis backend against a real Redis 7 with ACL users in CI: publishing, shard choice, outage and memory-full answers, the two-second timeout, the minimal ACL account and TLS where the service offers it; the retention job against groups with pending and unread entries once the consumer exists (REQ-QUEUE-GE19, REQ-QUEUE-1PF3, REQ-QUEUE-YATM, REQ-QUEUE-754R, REQ-QUEUE-BMGT).
+- Consumer: the consumer against a real Redis 7 and a real ClickHouse in CI: groups, pending and takeover, redelivery with and without other inserts in between, dead letters, back pressure, shutdown and the visit state across a restart, with the golden dataset for visits (REQ-INGEST-J5R5, REQ-INGEST-C5GW, REQ-INGEST-XS9C, REQ-INGEST-2FH3, REQ-INGEST-45RE, REQ-INGEST-DX9Z).
 - Integration: collector, queue, consumers and ClickHouse in Docker, including redelivery and queue outage cases, for each supported queue.
 - Language: `pnpm typecheck` runs strict TypeScript checks in every package, and a CI step fails when a `.js`, `.mjs`, `.cjs` or `.jsx` source file is tracked (REQ-TRACKER-2D61).
 - Contract: each service is checked against its OpenAPI document.
