@@ -1,7 +1,7 @@
 ---
 id: ADR-HB8W
 type: adr
-status: proposed
+status: accepted
 links:
   refines:
     - ADR-TDFQ
