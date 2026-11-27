@@ -1,7 +1,7 @@
 ---
 id: ADR-RH0Y
 type: adr
-status: proposed
+status: accepted
 links:
   refines:
     - ADR-WXH3
