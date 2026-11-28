@@ -28,11 +28,25 @@ export interface RegistryEventType {
   description: string;
 }
 
+export interface RegistryQueryParameter {
+  key: string;
+  name: string;
+  type: 'int';
+  unit: string | null;
+  min: number;
+  max: number;
+  since: string;
+  example: string;
+  description: string;
+}
+
 export interface Registry {
   protocol: number;
   revision: string;
   eventTypes: RegistryEventType[];
   fields: RegistryField[];
+  /** Parameters of the collect request URL; not keys of the body (revision 1.4). */
+  queryParameters: RegistryQueryParameter[];
 }
 
 export function loadRegistry(): Registry {

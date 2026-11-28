@@ -593,3 +593,69 @@ async fn client_hint_headers_fill_missing_signals() {
     assert_eq!(m["browser"], "Edge");
     assert_eq!(m["os"], "Windows");
 }
+
+fn post_aged(body: &str, query: &str) -> Request<Body> {
+    let mut req = post(body, "203.0.113.5");
+    *req.uri_mut() = format!("/v1/collect{query}").parse().unwrap();
+    req
+}
+
+// verifies: REQ-COLLECT-KSBB.S1 (a = 60000: the last event is dated 60 s before the receive time)
+// verifies: REQ-COLLECT-KSBB.S3 (no a: dated by the receive time as before)
+#[tokio::test]
+async fn late_batch_is_dated_by_its_age() {
+    let r = rig();
+    let body = "v::1|k::abc\nts::1000|u::/\nd::1200|u::/a\nd::800|u::/b";
+    send(&r, post_aged(body, "?a=60000")).await;
+    send(&r, post_aged(body, "")).await;
+    let q = queued(&r);
+    let t = |m: &serde_json::Value| -> Vec<u64> {
+        m["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["ts"].as_u64().unwrap())
+            .collect()
+    };
+    assert_eq!(t(&q[0]), vec![NOW - 62_000, NOW - 60_800, NOW - 60_000]);
+    assert_eq!(t(&q[1]), vec![NOW - 2000, NOW - 800, NOW]);
+    // The time the batch was received stays the real one.
+    assert_eq!(q[0]["received_at"], NOW);
+}
+
+// verifies: REQ-COLLECT-KSBB.S2 (an invalid age is ignored and the batch is accepted)
+#[tokio::test]
+async fn invalid_age_counts_as_zero() {
+    for query in [
+        "?a=-5",
+        "?a=abc",
+        "?a=1.5",
+        "?a=3600001",
+        "?a=",
+        "?a=99999999999999999999",
+        "?b=60000",
+        "?a=%36%30",
+    ] {
+        let r = rig();
+        let (status, _, _) = send(&r, post_aged("v::1|k::abc\nts::5|u::/", query)).await;
+        assert_eq!(status, StatusCode::ACCEPTED, "{query}");
+        assert_eq!(queued(&r)[0]["events"][0]["ts"], NOW, "{query}");
+    }
+    // The largest accepted age and a second parameter next to it.
+    let r = rig();
+    send(&r, post_aged("v::1|k::abc\nts::5|u::/", "?x=1&a=3600000")).await;
+    assert_eq!(queued(&r)[0]["events"][0]["ts"], NOW - 3_600_000);
+}
+
+// verifies: REQ-COLLECT-KSBB.S5 (the same body with different ages has the same batch token)
+#[tokio::test]
+async fn the_age_does_not_change_the_token() {
+    let r = rig();
+    let body = "v::1|k::abc\nts::5|u::/";
+    send(&r, post_aged(body, "")).await;
+    send(&r, post_aged(body, "?a=1000")).await;
+    send(&r, post_aged(body, "?a=900000")).await;
+    let q = queued(&r);
+    assert_eq!(q[0]["token"], q[1]["token"]);
+    assert_eq!(q[1]["token"], q[2]["token"]);
+}

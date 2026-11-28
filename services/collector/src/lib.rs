@@ -227,7 +227,7 @@ fn retry_after(status: StatusCode, seconds: u64) -> Response {
     (status, [(header::RETRY_AFTER, seconds.to_string())]).into_response()
 }
 
-// spec: REQ-COLLECT-C50Y, REQ-COLLECT-Y37S, REQ-COLLECT-4VTR, REQ-COLLECT-FWT0, REQ-COLLECT-FRDS
+// spec: REQ-COLLECT-KSBB, REQ-COLLECT-C50Y, REQ-COLLECT-Y37S, REQ-COLLECT-4VTR, REQ-COLLECT-FWT0, REQ-COLLECT-FRDS
 async fn collect(State(s): State<Arc<AppState>>, req: Request<Body>) -> Response {
     let now = (s.clock)();
     let peer = req
@@ -240,6 +240,7 @@ async fn collect(State(s): State<Arc<AppState>>, req: Request<Body>) -> Response
         .and_then(|v| v.to_str().ok());
     let client = clientip::resolve(peer, forwarded, &s.trusted);
     let headers = req.headers().clone();
+    let age = envelope::batch_age(req.uri().query());
 
     if let Err(wait) = s.limiter.check(client, now) {
         s.metrics.rate_limited.fetch_add(1, Ordering::Relaxed);
@@ -294,8 +295,24 @@ async fn collect(State(s): State<Arc<AppState>>, req: Request<Body>) -> Response
     let user_agent = headers
         .get(header::USER_AGENT)
         .map_or(&b""[..], |v| v.as_bytes());
-    let session = session::session_hash(&s.salts.salt(now), site, client, user_agent);
-    let message = envelope::build(batch, site, token, now, detection, country, session.clone());
+    let session = session::session_hash(
+        &s.salts.salt_at(now.saturating_sub(age), now),
+        site,
+        client,
+        user_agent,
+    );
+    let message = envelope::build(
+        batch,
+        site,
+        token,
+        envelope::Arrival {
+            received_at: now,
+            age_ms: age,
+        },
+        detection,
+        country,
+        session.clone(),
+    );
     let payload = match serde_json::to_vec(&message) {
         Ok(p) => p,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),

@@ -20,6 +20,11 @@ pub type Salt = Zeroizing<[u8; 32]>;
 /// too, so the hash does not change when it arrives.
 pub trait SaltSource: Send + Sync {
     fn salt(&self, now_ms: u64) -> Salt;
+
+    /// The salt for an event that happened at `event_ms` and arrives at `now_ms`: the salt of the
+    /// event's day while it is still held, otherwise the salt of today (REQ-COLLECT-KSBB). It
+    /// never creates a salt for a day that is over.
+    fn salt_at(&self, event_ms: u64, now_ms: u64) -> Salt;
 }
 
 /// Random salts kept in memory, one per UTC day. Suits one replica: another replica has other
@@ -53,6 +58,20 @@ impl SaltSource for MemorySalts {
                 bytes
             })
             .clone()
+    }
+
+    fn salt_at(&self, event_ms: u64, now_ms: u64) -> Salt {
+        let earlier = event_ms / DAY_MS;
+        if earlier != now_ms / DAY_MS {
+            let days = self.days.lock().expect("salts");
+            if let Some(salt) = days
+                .get(&earlier)
+                .filter(|_| (earlier + 1) * DAY_MS + GRACE_MS > now_ms)
+            {
+                return salt.clone();
+            }
+        }
+        self.salt(now_ms)
     }
 }
 
@@ -135,5 +154,19 @@ impl SaltSource for PgSalts {
             );
         }
         self.fallback.salt(now_ms)
+    }
+
+    fn salt_at(&self, event_ms: u64, now_ms: u64) -> Salt {
+        let earlier = event_ms / DAY_MS;
+        if earlier != now_ms / DAY_MS {
+            let loaded = self.loaded.lock().expect("salts");
+            if let Some(salt) = loaded
+                .get(&earlier)
+                .filter(|_| (earlier + 1) * DAY_MS + GRACE_MS > now_ms)
+            {
+                return salt.clone();
+            }
+        }
+        self.salt(now_ms)
     }
 }
