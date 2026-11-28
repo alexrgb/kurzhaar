@@ -33,6 +33,10 @@ interface Ev {
 }
 // Performance and layout-shift entries carry fields the DOM typings do not list.
 type Pe = PerformanceEntry & { hadRecentInput?: boolean; interactionId?: number; value?: number };
+interface Msg {
+  b: string;
+  t: number;
+}
 interface Lt {
   track(name: string, props?: Props, tags?: string[]): void;
   identify(id: string, traits?: Props): void;
@@ -71,7 +75,12 @@ interface Lt {
     uad = (nav as Navigator & { userAgentData?: Uad }).userAgentData,
     cv: string | undefined,
     waiting = false,
-    hintTimer: ReturnType<typeof setTimeout> | 0 = 0;
+    hintTimer: ReturnType<typeof setTimeout> | 0 = 0,
+    // Built batches waiting to be delivered, the retry timer, whether a request is in flight and the failures in a row.
+    pend: Msg[] = [],
+    retry: ReturnType<typeof setTimeout> | 0 = 0,
+    busy = 0,
+    fails = 0;
 
   // Query params kept by default; everything else is stripped client-side (may contain tokens or emails).
   var KEEP = /^(utm_\w+|gclid|fbclid|msclkid|ttclid|twclid|li_fat_id|gad_source|dclid|wbraid|gbraid|mc_cid|igshid|ref)$/;
@@ -171,22 +180,94 @@ interface Lt {
     return lines.join('\n');
   }
 
-  function flush(): void {
-    clearTimeout(timer || undefined);
-    timer = 0;
-    if (!q.length || off()) {
-      q = [];
-      return;
-    }
-    var body = encode(q);
-    q = [];
-    sent = 1;
-    // text/plain avoids a CORS preflight; beacons survive page unload.
-    if (!(nav.sendBeacon && nav.sendBeacon(url, body))) {
+  // spec: REQ-TRACKER-2P41, REQ-TRACKER-7NVW
+  // Sending (ADR-RH0Y). Built batches wait in `pend`, first in first out, in page memory only. One request is in flight at a
+  // time; a failure waits (1 s doubling to 60 s, plus up to 50% jitter, or the longer Retry-After up to 300 s) and the
+  // same bytes go again with the batch age in `?a=`. At most 10 batches wait and none is kept longer than an hour.
+  function beacon(m: Msg): void {
+    var age = Date.now() - m.t;
+    var u = url + (age > 0 ? '?a=' + age : '');
+    // text/plain avoids a CORS preflight; a beacon survives page unload but its answer cannot be read.
+    if (!(nav.sendBeacon && nav.sendBeacon(u, m.b))) {
       try {
-        fetch(url, { method: 'POST', body: body, keepalive: true, credentials: 'omit' });
+        fetch(u, { method: 'POST', body: m.b, keepalive: true, credentials: 'omit' });
       } catch (e) {}
     }
+  }
+
+  function drain(): void {
+    var m = pend[0];
+    if (busy || retry || !m) return;
+    if (off()) {
+      pend = [];
+      return;
+    }
+    var age = Date.now() - m.t;
+    if (age > 3600000) {
+      pend.shift();
+      return drain();
+    }
+    if (typeof fetch !== 'function') {
+      pend.shift();
+      beacon(m);
+      return drain();
+    }
+    busy = 1;
+    var done = function (status: number, after?: string | null): void {
+      busy = 0;
+      if (status >= 200 && status < 300) fails = 0;
+      else if (!status || status >= 500 || status === 429 || status === 408) {
+        var wait = Math.min(60000, 1000 * Math.pow(2, fails++));
+        var ra = parseInt(after || '', 10);
+        if (ra > 0) wait = Math.max(wait, Math.min(ra, 300) * 1000);
+        retry = setTimeout(function () {
+          retry = 0;
+          drain();
+        }, wait * (1 + Math.random() / 2));
+        return;
+      }
+      // Accepted, or an answer a second attempt cannot change.
+      if (pend[0] === m) pend.shift();
+      drain();
+    };
+    try {
+      fetch(url + (age > 0 ? '?a=' + age : ''), { method: 'POST', body: m.b, keepalive: true, credentials: 'omit' }).then(
+        function (r) {
+          done(r.status, r.headers && r.headers.get('Retry-After'));
+        },
+        function () {
+          done(0);
+        }
+      );
+    } catch (e) {
+      done(0);
+    }
+  }
+
+  // `unload`: the page is going away, so send what waits once with a beacon and stop retrying.
+  function flush(unload?: boolean): void {
+    clearTimeout(timer || undefined);
+    timer = 0;
+    if (off()) {
+      q = [];
+      pend = [];
+      return;
+    }
+    if (q.length) {
+      pend.push({ b: encode(q), t: Date.now() });
+      q = [];
+      sent = 1;
+      // Drop the oldest batch that is not in flight.
+      if (pend.length > 10) pend.splice(busy ? 1 : 0, 1);
+    }
+    if (unload === true) {
+      clearTimeout(retry || undefined);
+      retry = 0;
+      pend.splice(busy ? 1 : 0).forEach(beacon);
+      if (!busy) pend = [];
+      return;
+    }
+    drain();
   }
 
   function push(ev: Omit<Ev, 'ts'>): void {
@@ -268,7 +349,7 @@ interface Lt {
     engage(lastPath);
     vis = false;
     vitals();
-    flush();
+    flush(true);
   }
 
   if (s.getAttribute('data-vitals') !== 'false' && PO) {
@@ -341,7 +422,7 @@ interface Lt {
     };
   }
 
-  w.lt = w.lt || { track: track, identify: identify, flush: flush };
+  w.lt = w.lt || { track: track, identify: identify, flush: function () { flush(); } };
 
   if (s.getAttribute('data-auto') !== 'false') {
     view(d.referrer ? refOf(d.referrer) : '');
