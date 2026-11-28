@@ -24,6 +24,16 @@ test('every entry is complete and keys are unique', () => {
   assert.equal(new Set(ys).size, ys.length, 'duplicate event type');
 });
 
+test('query parameters are well formed and do not clash with body keys', () => {
+  const keys = new Set(reg.fields.map((f) => f.key));
+  for (const q of reg.queryParameters) {
+    assert.ok(!keys.has(q.key), `${q.key} is also a body key`);
+    assert.match(q.since, /^\d+\.\d+$/, q.key);
+    assert.ok(q.min <= Number(q.example) && Number(q.example) <= q.max, q.key);
+    assert.ok(q.description.length > 0, q.key);
+  }
+});
+
 test('every event field names only registered event types', () => {
   const ys = new Set(reg.eventTypes.map((t) => t.y));
   for (const f of reg.fields) if (Array.isArray(f.types)) for (const y of f.types) assert.ok(ys.has(y), `${f.key}: unknown type ${y}`);

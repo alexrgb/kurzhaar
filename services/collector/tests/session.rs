@@ -35,6 +35,9 @@ impl SaltSource for Fixed {
     fn salt(&self, _: u64) -> Salt {
         Zeroizing::new([self.0; 32])
     }
+    fn salt_at(&self, _: u64, _: u64) -> Salt {
+        Zeroizing::new([self.0; 32])
+    }
 }
 
 fn salt(b: u8) -> Salt {
@@ -255,4 +258,25 @@ fn salt_exists_at_midnight() {
     let first = salts.salt(3 * DAY);
     assert_eq!(salts.held_days(), vec![3]);
     assert_eq!(*first, *salts.salt(3 * DAY + 1));
+}
+
+// verifies: REQ-COLLECT-KSBB.S4 (a late batch uses the salt of its day while held, else the salt of today)
+#[test]
+fn late_batch_takes_the_salt_of_its_day_only_while_it_is_held() {
+    let salts = MemorySalts::new();
+    let yesterday = salts.salt(DAY - 1000);
+    let today = salts.salt(DAY + 1000);
+    assert_ne!(*yesterday, *today);
+    // Five minutes after midnight the day before is still held.
+    assert_eq!(*salts.salt_at(DAY - 2000, DAY + 5 * 60_000), *yesterday);
+    // Twelve minutes after midnight it is gone: today's salt is used and none is created.
+    assert_eq!(*salts.salt_at(DAY - 2000, DAY + 12 * 60_000), *today);
+    assert_eq!(salts.held_days(), vec![1]);
+    // Within one day it is the plain salt of the day.
+    assert_eq!(*salts.salt_at(DAY + 100, DAY + 9000), *today);
+    // A day that never had a salt does not get one made up.
+    let fresh = MemorySalts::new();
+    let now = fresh.salt_at(5, DAY + 1000);
+    assert_eq!(*now, *fresh.salt(DAY + 1000));
+    assert_eq!(fresh.held_days(), vec![1]);
 }

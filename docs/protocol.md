@@ -2,7 +2,7 @@
 
 <!-- Generated from contracts/protocol/fields.json by packages/protocol/scripts/reference.ts. Do not edit. -->
 
-Wire format version 1, revision 1.3. Revisions inside a version only add optional fields; decoders ignore keys they do not know. The decisions behind the format are in ADR-T7N1 and ADR-VJGJ.
+Wire format version 1, revision 1.4. Revisions inside a version only add optional fields; decoders ignore keys they do not know. The decisions behind the format are in ADR-T7N1 and ADR-VJGJ.
 
 A batch is plain text. Line 1 is the header, every following line is one event. A line is a list of `key::value` fields joined by `|`. In values, `%`, `|`, CR and LF are escaped as `%XX`.
 
@@ -55,6 +55,14 @@ A batch is plain text. Line 1 is the header, every following line is one event. 
 | `cls` | cumulative layout shift | `cls` | decimal | - | no | 4 | 1.1 | Web Vitals CLS, a unitless decimal. |
 | `fcp` | first contentful paint | `fcp` | int | ms | no | 4 | 1.1 | Web Vitals FCP. |
 | `ttfb` | time to first byte | `ttfb` | int | ms | no | 4 | 1.1 | Web Vitals TTFB. |
+
+## Query parameters
+
+Parameters of the collect request URL, not keys of the body. They never change the body, so the batch token stays the same.
+
+| Key | Name | Type | Unit | Range | Since | Description |
+|---|---|---|---|---|---|---|
+| `a` | batch age | int | ms | 0 to 3600000 | 1.4 | Milliseconds between the moment the tracker built the batch and the moment this attempt is sent, a query parameter of the collect request and not part of the body. A missing or invalid value counts as 0. |
 
 ## Example
 

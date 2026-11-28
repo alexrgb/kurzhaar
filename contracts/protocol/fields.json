@@ -1,7 +1,7 @@
 {
-  "_comment": "Registry of wire format v1 keys (ADR-VJGJ). Every implementation is tested against it; docs/protocol.md is generated from it. Revisions inside v1 only add optional fields (1.1 = ADR-B0B4, 1.2 = ADR-6RMH, 1.3 = ADR-ZKD1).",
+  "_comment": "Registry of wire format v1 keys (ADR-VJGJ). Every implementation is tested against it; docs/protocol.md is generated from it. Revisions inside v1 only add optional fields (1.1 = ADR-B0B4, 1.2 = ADR-6RMH, 1.3 = ADR-ZKD1, 1.4 = ADR-RH0Y).",
   "protocol": 1,
-  "revision": "1.3",
+  "revision": "1.4",
   "eventTypes": [
     {
       "y": 0,
@@ -448,6 +448,19 @@
       "since": "1.1",
       "example": "200",
       "description": "Web Vitals TTFB."
+    }
+  ],
+  "queryParameters": [
+    {
+      "key": "a",
+      "name": "batch age",
+      "type": "int",
+      "unit": "ms",
+      "min": 0,
+      "max": 3600000,
+      "since": "1.4",
+      "example": "60000",
+      "description": "Milliseconds between the moment the tracker built the batch and the moment this attempt is sent, a query parameter of the collect request and not part of the body. A missing or invalid value counts as 0."
     }
   ]
 }

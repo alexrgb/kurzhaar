@@ -46,6 +46,22 @@ pub fn token(site_key: &str, body: &[u8]) -> String {
         .collect()
 }
 
+/// The longest age the collector accepts for a batch: one hour (REQ-COLLECT-KSBB).
+pub const MAX_BATCH_AGE_MS: u64 = 3_600_000;
+
+/// The batch age from the `a` query parameter. A value that is missing, is not a whole number
+/// of milliseconds or is out of range counts as 0; the batch is never rejected for it.
+pub fn batch_age(query: Option<&str>) -> u64 {
+    query
+        .into_iter()
+        .flat_map(|q| q.split('&'))
+        .find_map(|pair| pair.strip_prefix("a="))
+        .filter(|v| !v.is_empty() && v.len() <= 7 && v.bytes().all(|b| b.is_ascii_digit()))
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|a| *a <= MAX_BATCH_AGE_MS)
+        .unwrap_or(0)
+}
+
 /// Event time from the receive time and the offsets inside the batch; the client clock is not
 /// used (REQ-COLLECT-8J26).
 fn event_times(events: &[Event], received_at: u64) -> Vec<u64> {
@@ -64,16 +80,24 @@ fn limit_tags(tags: Vec<String>) -> Vec<String> {
         .collect()
 }
 
+/// When a batch was received and how old its events were already, from the `a` parameter.
+#[derive(Debug, Clone, Copy)]
+pub struct Arrival {
+    pub received_at: u64,
+    pub age_ms: u64,
+}
+
 pub fn build(
     batch: Batch,
     site: &str,
     token: String,
-    received_at: u64,
+    arrival: Arrival,
     detection: Detection,
     country: Option<String>,
     session: String,
 ) -> Envelope {
-    let times = event_times(&batch.events, received_at);
+    let received_at = arrival.received_at;
+    let times = event_times(&batch.events, received_at.saturating_sub(arrival.age_ms));
     let events = batch
         .events
         .into_iter()
